@@ -1,0 +1,10 @@
+{
+  "files": {
+    "main.js": "/fora/static/js/main.a4f8d0aa.js",
+    "index.html": "/fora/index.html",
+    "main.a4f8d0aa.js.map": "/fora/static/js/main.a4f8d0aa.js.map"
+  },
+  "entrypoints": [
+    "static/js/main.a4f8d0aa.js"
+  ]
+}
