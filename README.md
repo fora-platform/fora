@@ -1,75 +1,39 @@
-<<<<<<< HEAD
-# Getting Started with Create React App
+# ◆ FORA — FORest Analysis Platform
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A browser-based web platform for processing UAV-LiDAR and ALS data 
+in complex forest structures.
 
-## Available Scripts
+**Live:** https://fora-platform.github.io/fora
 
-In the project directory, you can run:
+## Features
+- LAS 1.2–1.4 and PLY (ASCII/Binary) file support
+- Interactive 3D/2D point cloud visualization
+- Height normalization and spatial clipping
+- CHM-based individual tree segmentation
+- Area-based and individual tree metrics
+- Allometric DBH estimation (Turkish species database)
+- Statistical comparison (paired t-test)
+- Transect profile extraction
+- CSV export with area-based metrics
+- Bilingual (TR/EN) interface
 
-### `npm start`
+## Quick Start
+1. Visit https://fora-platform.github.io/fora
+2. Upload a LAS or PLY file
+3. Click on 2D view to set clip center → Cut
+4. Run segmentation
+5. View metrics and export CSV
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## Technology
+- React 19 + Three.js (r128)
+- Pure client-side processing (no server required)
+- MIT License
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Citation
+If you use FORA in your research, please cite:
+> Gençal, B. (2026). FORA: A browser-based platform for processing 
+> UAV-LiDAR data in forest structures. SoftwareX. 
+> DOI: [Zenodo DOI]
 
-### `npm test`
-
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
-
-### `npm run build`
-
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
-=======
-# fora
-FORA: A browser-based platform for processing UAV-LiDAR data in forest structures
->>>>>>> 402faf7ded910a92b1b90f6c54dd956217911ad2
+## Author
+Burhan Gençal — Bursa Technical University, Faculty of Forestry
