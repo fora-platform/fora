@@ -63,12 +63,11 @@ const SP=[
   // Assumes H_dom=H+2m, D_dom=35cm for estimation; inverse-solved numerically
   {id:"fo",name:"Kayın (F. orientalis)",ref:"Ercanli 2015 (Kestel-Bursa)",fn:(h,cd)=>{const a=1.659,b=0.051,H0=Math.max(h+1,10),D0=35;let lo=0.1,hi=150;for(let i=0;i<40;i++){const d=(lo+hi)/2;const num=1-Math.exp(-b*d),den=1-Math.exp(-b*D0);const hPred=Math.pow(Math.pow(1.3,a)+(Math.pow(H0,a)-Math.pow(1.3,a))*num/den,1/a);if(hPred<h)lo=d;else hi=d;}return Math.max(0,(lo+hi)/2);}},
   // Carus & Akguş (2018) DOI:10.18182/tjf.338311 — Prodan (Tarsus, Pinus pinea)
-  // PDF verification needed; using Näslund power approximation as conservative fallback
-  // derived from typical P. pinea allometry in Mediterranean plantations
-  {id:"pp",name:"Fıstıkçamı (P. pinea)",ref:"Carus & Akguş 2018 (PDF verification pending)",fn:(h,cd)=>{if(h<=1.3)return NaN;const dh=h-1.3;return Math.max(0,1.8*Math.pow(dh,0.95));}},
+  // EXPERIMENTAL: PDF verification pending; using Näslund power approximation as conservative fallback
+  {id:"pp",name:"Fıstıkçamı (P. pinea) [BETA]",ref:"Carus & Akguş 2018 (PDF verification pending)",experimental:true,fn:(h,cd)=>{if(h<=1.3)return NaN;const dh=h-1.3;return Math.max(0,1.8*Math.pow(dh,0.95));}},
   // Cimini & Salvati (2011) — Q. cerris (Sicily, proxy for Turkish data)
-  // Simplified to avoid extrapolation: h = 1.3 + a*(1-exp(-b*d))^c
-  {id:"qc",name:"Meşe (Q. cerris)",ref:"Cimini & Salvati 2011 (proxy, Türkiye verisi aranıyor)",fn:(h,cd)=>{if(h<=1.3)return NaN;const a=30,b=0.035,c=1.2;let lo=0.1,hi=120;for(let i=0;i<40;i++){const d=(lo+hi)/2;const hPred=1.3+a*Math.pow(1-Math.exp(-b*d),c);if(hPred<h)lo=d;else hi=d;}return Math.max(0,(lo+hi)/2);}}
+  // EXPERIMENTAL: Turkish-calibrated equation pending
+  {id:"qc",name:"Meşe (Q. cerris) [BETA]",ref:"Cimini & Salvati 2011 (proxy — Türkiye verisi aranıyor)",experimental:true,fn:(h,cd)=>{if(h<=1.3)return NaN;const a=30,b=0.035,c=1.2;let lo=0.1,hi=120;for(let i=0;i<40;i++){const d=(lo+hi)/2;const hPred=1.3+a*Math.pow(1-Math.exp(-b*d),c);if(hPred<h)lo=d;else hi=d;}return Math.max(0,(lo+hi)/2);}}
 ];
 
 // Biomass models — Sönmez, Kahriman, Şahin, Yavuz (2016) for Pinus brutia
@@ -335,6 +334,7 @@ return(<><div style={{fontSize:9,color:txD,marginBottom:8}}>{L?"Manuel değer gi
 
 {tab==="species"&&(<Sc t={L?"Tür":"Species"}><select style={{...IN,width:"100%",marginBottom:6}} value={sp} onChange={e=>setSp(e.target.value)}>{SP.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select>
 <div style={{fontSize:9,color:txD,marginBottom:6,padding:"4px 6px",background:dk,borderRadius:3,borderLeft:`2px solid ${ac}`}}>📖 {SP.find(s=>s.id===sp)?.ref||""}</div>
+{SP.find(s=>s.id===sp)?.experimental&&<div style={{fontSize:9,color:og,marginBottom:6,padding:"4px 6px",background:dk,borderRadius:3,borderLeft:`2px solid ${og}`,fontWeight:600}}>⚠ {L?"BETA: Bu tür için Türkiye-kalibreli katsayılar henüz doğrulanmadı. Sonuçlar yaklaşık — dikkatli kullanın.":"BETA: Turkey-calibrated coefficients not yet verified for this species. Results are approximate — use with caution."}</div>}
 {sp.startsWith("pb")&&<div style={{fontSize:9,color:gn2,marginBottom:6,padding:"4px 6px",background:dk,borderRadius:3,borderLeft:`2px solid ${gn2}`}}>🌲 {L?"Biyokütle: Sönmez et al. 2016":"Biomass: Sönmez et al. 2016"}</div>}
 <button style={{...BT(true),width:"100%"}} onClick={hSp} disabled={!met}>{L?"Uygula":"Apply"}</button></Sc>)}
 
