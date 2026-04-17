@@ -49,9 +49,9 @@ for(let i=0;i<pts.x.length;i++){const px=pts.x[i]-p1.x,py=pts.y[i]-p1.y;const al
 // All formulas return DBH in cm given H in m and CD in m
 // Inverse-solving used for pure h-d models (Gompertz, Schnute, Prodan)
 const SP=[
-  // Gençal (2025) PhD thesis + Karahalil & Karsli (2017, TÜBİTAK 115O013)
-  {id:"ps",name:"Sarıçam (P. sylvestris)",ref:"Gençal 2025 + Karahalil 2017",fn:(h,cd)=>Math.max(0,-5.22+1.65*h+2.35*cd)},
-  {id:"ab",name:"Göknar (A. bornmuelleriana)",ref:"Gençal 2025 + Karahalil 2017",fn:(h,cd)=>Math.max(0,-6.27+1.80*h+2.06*cd)},
+  // Gencal (2025) PhD thesis + Karahalil & Karsli (2017,)
+  {id:"ps",name:"Sarıçam (P. sylvestris)",ref:"Gencal 2025 + Karahalil 2017",fn:(h,cd)=>Math.max(0,-5.22+1.65*h+2.35*cd)},
+  {id:"ab",name:"Göknar (A. bornmuelleriana)",ref:"Gencal 2025 + Karahalil 2017",fn:(h,cd)=>Math.max(0,-6.27+1.80*h+2.06*cd)},
   // Özçelik et al. (2014) DOI:10.3906/TAR-1304-115 — Gompertz, inverse-solved for d
   // Formula: h = 1.3 + a·exp(-b·exp(-c·d))  →  d = -ln(-ln((h-1.3)/a)/b)/c
   {id:"pb_me",name:"Kızılçam-Sahil (P. brutia ME)",ref:"Özçelik 2014",fn:(h,cd)=>{const a=22.527,b=1.823,c=0.062;if(h<=1.3||h>=a+1.3)return NaN;const inner=(h-1.3)/a;if(inner<=0||inner>=1)return NaN;const lni=-Math.log(inner)/b;if(lni<=0)return NaN;return Math.max(0,-Math.log(lni)/c);}},

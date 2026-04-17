@@ -158,7 +158,7 @@ https://fora-platform.github.io/fora
 ### Citation
 ```bibtex
 @software{gencal2026fora,
-  author  = {Gençal, Burhan},
+  author  = {Gencal, Burhan},
   title   = {FORA: A browser-based platform for processing UAV-LiDAR point clouds in forest structures},
   version = {1.0.0},
   year    = {2026},
@@ -239,7 +239,7 @@ ADIM 6 — MAKALELERE DOI EKLE
 
 Referans [31] güncelle:
 ```
-[31] Gençal B. FORA v1.0.0 [software]. GitHub; 2026. 
+[31] Gencal B. FORA v1.0.0 [software]. GitHub; 2026. 
      https://github.com/fora-platform/fora. 
      https://doi.org/10.5281/zenodo.XXXXXXX
 ```

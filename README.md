@@ -67,8 +67,8 @@ FORA includes 8 published allometric models for Turkish forest species:
 
 | Species | Model | Source |
 |---------|-------|--------|
-| *Pinus sylvestris* (Sarıçam) | DBH = −5.22 + 1.65·H + 2.35·CD | Gençal (2025) PhD thesis + Karahalil & Karslı (2017) TÜBİTAK 115O013 |
-| *Abies bornmuelleriana* (Uludağ göknarı) | DBH = −6.27 + 1.80·H + 2.06·CD | Gençal (2025) + Karahalil & Karslı (2017) |
+| *Pinus sylvestris* (Sarıçam) | DBH = −5.22 + 1.65·H + 2.35·CD | Gencal (2025) PhD thesis + Karahalil & Karsli (2017) |
+| *Abies bornmuelleriana* (Uludağ göknarı) | DBH = −6.27 + 1.80·H + 2.06·CD | Gencal (2025) + Karahalil & Karsli (2017) |
 | *Pinus brutia* ME — coastal (Kızılçam) | Gompertz, a=22.527, b=1.823, c=0.062 | Özçelik et al. (2014) |
 | *Pinus brutia* IE — inland | Gompertz, a=25.911, b=2.004, c=0.045 | Özçelik et al. (2014) |
 | *Pinus brutia* LE — lake | Gompertz, a=24.207, b=1.465, c=0.038 | Özçelik et al. (2014) |
@@ -105,7 +105,7 @@ If you use FORA in your research, please cite:
 
 ```bibtex
 @software{gencal2026fora,
-  author  = {Gençal, Burhan},
+  author  = {Gencal, Burhan},
   title   = {FORA: A browser-based platform for processing UAV-LiDAR point clouds in forest structures},
   version = {1.0.0},
   year    = {2026},
@@ -115,7 +115,7 @@ If you use FORA in your research, please cite:
 ```
 
 And the accompanying publication (under review):
-> Gençal B. (2026) FORA: A browser-based platform for processing UAV-LiDAR point clouds in forest structures. *SoftwareX* (under review).
+> Gencal B. (2026) FORA: A browser-based platform for processing UAV-LiDAR point clouds in forest structures. *SoftwareX* (under review).
 
 ---
 
@@ -149,23 +149,19 @@ FORA is released under the **MIT License** — see [LICENSE](LICENSE) for detail
 
 ## Author
 
-**Burhan Gençal**  
+**Burhan Gencal**  
 Bursa Technical University, Faculty of Forestry  
 Department of Forest Engineering  
 16310 Bursa, Türkiye  
 📧 burhan.gencal@btu.edu.tr
 
-**Supervisor:** Prof. Dr. Turan Sönmez (BTU Forest Engineering)
-
 ---
 
 ## Acknowledgments
 
-- Alfred Wegener Institute (AWI) and North-Eastern Federal University of Yakutsk (NEFU) for PANGAEA UAV LiDAR datasets (Kruse et al. 2025)
-- TÜBİTAK project 224O168 (partial support)
-- Uzay Karahalil and Fevzi Karslı for TÜBİTAK project 115O013
-- Turan Sönmez, Aydın Kahriman, Abdurrahman Şahin, Mehmet Yavuz for *Pinus brutia* biomass equations
-- İlker Ercanli for Kestel-Bursa *Fagus orientalis* data
+- Alfred Wegener Institute (AWI) and North-Eastern Federal University of Yakutsk (NEFU) for providing open UAV LiDAR datasets via PANGAEA (Kruse et al. 2025)
+- The PANGAEA repository for free access to the validation datasets
+- All authors whose published allometric equations are implemented in this software (see `ALLOMETRIC_MODELS.md` for full citations)
 
 ---
 

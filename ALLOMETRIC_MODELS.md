@@ -11,8 +11,8 @@ DBH = −5.22 + 1.65·H + 2.35·CD
 ```
 
 **Source:** 
-- Gençal B. (2025) Meşcere parametrelerinin insansız hava araçları (İHA) ile tahmin edilmesi. PhD Thesis, Bursa Technical University, Graduate School, Bursa.
-- Karahalil U, Karslı F. (2017) Meşcere parametrelerinin yerel uydu ve dijital kamera görüntüleriyle tahmini ve farklı uydu görüntü verileri ile karşılaştırılması. TÜBİTAK Proje No. 115O013. Artvin Çoruh Üniversitesi.
+- Gencal B. (2025) Meşcere parametrelerinin insansız hava araçları (İHA) ile tahmin edilmesi. PhD Thesis, Bursa Technical University, Graduate School, Bursa.
+- Karahalil U, Karsli F. (2017) Meşcere parametrelerinin yerel uydu ve dijital kamera görüntüleriyle tahmini ve farklı uydu görüntü verileri ile karşılaştırılması. Artvin Çoruh Üniversitesi.
 
 **Sample:** n = 2,956 trees (UAV-LiDAR paired with ground measurements)
 
@@ -26,7 +26,7 @@ DBH = −5.22 + 1.65·H + 2.35·CD
 DBH = −6.27 + 1.80·H + 2.06·CD
 ```
 
-**Source:** Same as P. sylvestris (Gençal 2025 + Karahalil 2017)
+**Source:** Same as P. sylvestris (Gencal 2025 + Karahalil 2017)
 
 ---
 

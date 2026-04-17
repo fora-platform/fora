@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "deploy": "gh-pages -d dist"
   },
-  "author": "Burhan Gençal <burhan.gencal@btu.edu.tr>",
+  "author": "Burhan Gencal <burhan.gencal@btu.edu.tr>",
   "license": "MIT",
   "homepage": "https://fora-platform.github.io/fora",
   "repository": {

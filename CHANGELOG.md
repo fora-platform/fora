@@ -16,8 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CHM-based individual tree detection with marker-controlled watershed
 - Area-based approach (ABA) metrics: H5–H99 percentiles, D1–D9 density ratios, CC₁.₃, kurtosis, IQR, CV
 - 8 allometric DBH models for Turkish tree species:
-  - *Pinus sylvestris* — Gençal (2025) + Karahalil & Karslı (2017)
-  - *Abies bornmuelleriana* — Gençal (2025) + Karahalil & Karslı (2017)
+  - *Pinus sylvestris* — Gencal (2025) + Karahalil & Karsli (2017)
+  - *Abies bornmuelleriana* — Gencal (2025) + Karahalil & Karsli (2017)
   - *Pinus brutia* (3 ecoregions) — Özçelik et al. (2014)
   - *Pinus nigra* — Özçelik et al. (2014)
   - *Fagus orientalis* — Ercanli (2015)
