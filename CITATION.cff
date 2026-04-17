@@ -1,10 +1,10 @@
 cff-version: 1.2.0
-title: "FORA: A browser-based platform for processing UAV-LiDAR point clouds in forest structures"
 message: "If you use this software, please cite it as below."
-type: software
+title: "FORA: A browser-based platform for processing UAV-LiDAR point clouds in forest structures"
 version: 1.0.0
-date-released: "2026-04-17"
+date-released: 2026-04-17
 license: MIT
+type: software
 repository-code: "https://github.com/fora-platform/fora"
 url: "https://fora-platform.github.io/fora"
 authors:
@@ -22,13 +22,3 @@ keywords:
   - "forest inventory"
   - "allometric models"
   - "biomass estimation"
-abstract: >-
-  FORA (FORest Analysis) is an open-source, browser-based web platform for
-  processing forest LiDAR point clouds at individual tree and stand levels.
-  Built with React 19 and Three.js, the platform performs LAS file parsing,
-  interactive 3D/2D visualization, height normalization, spatial clipping,
-  canopy height model based tree segmentation, area-based metric extraction,
-  allometric diameter estimation for multiple tree species, aboveground biomass
-  estimation for Pinus brutia, transect profile analysis, and paired
-  statistical comparison, all entirely on the client side, requiring no
-  installation, server infrastructure, or programming knowledge.
