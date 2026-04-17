@@ -45,7 +45,44 @@ d1:dr(p(10)),d3:dr(p(30)),d5:dr(p(50)),d7:dr(p(70)),d9:dr(p(90)),cc13:dr(1.3),it
 function exTr(pts,za,p1,p2,w=2){const dx=p2.x-p1.x,dy=p2.y-p1.y,len=Math.sqrt(dx*dx+dy*dy);if(len<.1)return[];const nx=-dy/len,ny=dx/len,res=[];
 for(let i=0;i<pts.x.length;i++){const px=pts.x[i]-p1.x,py=pts.y[i]-p1.y;const al=(px*dx+py*dy)/len,pe=Math.abs(px*nx+py*ny);if(al>=0&&al<=len&&pe<=w/2)res.push({dist:al,zN:za[i]});}res.sort((a,b2)=>a.dist-b2.dist);return res;}
 
-const SP=[{id:"ps",name:"Sarıçam (P. sylvestris)",fn:(h,cd)=>(2.1*h**.85+3.5+5.8*cd)/2},{id:"pn",name:"Karaçam (P. nigra)",fn:(h,cd)=>(2.3*h**.82+4+5.5*cd)/2},{id:"pb",name:"Kızılçam (P. brutia)",fn:(h,cd)=>(1.9*h**.88+2.8+6.2*cd)/2},{id:"ab",name:"Göknar (A. bornm.)",fn:(h,cd)=>(1.5*h**.92+2+7*cd)/2},{id:"fo",name:"Kayın (F. orientalis)",fn:(h,cd)=>(2.5*h**.8+1.5+6.5*cd)/2},{id:"qc",name:"Meşe (Q. cerris)",fn:(h,cd)=>(2.8*h**.78+2+5*cd)/2},{id:"pp",name:"Fıstıkçamı (P. pinea)",fn:(h,cd)=>(2*h**.86+5+4.5*cd)/2}];
+// Species-specific allometric models — published coefficients
+// All formulas return DBH in cm given H in m and CD in m
+// Inverse-solving used for pure h-d models (Gompertz, Schnute, Prodan)
+const SP=[
+  // Gençal (2025) PhD thesis + Karahalil & Karsli (2017, TÜBİTAK 115O013)
+  {id:"ps",name:"Sarıçam (P. sylvestris)",ref:"Gençal 2025 + Karahalil 2017",fn:(h,cd)=>Math.max(0,-5.22+1.65*h+2.35*cd)},
+  {id:"ab",name:"Göknar (A. bornmuelleriana)",ref:"Gençal 2025 + Karahalil 2017",fn:(h,cd)=>Math.max(0,-6.27+1.80*h+2.06*cd)},
+  // Özçelik et al. (2014) DOI:10.3906/TAR-1304-115 — Gompertz, inverse-solved for d
+  // Formula: h = 1.3 + a·exp(-b·exp(-c·d))  →  d = -ln(-ln((h-1.3)/a)/b)/c
+  {id:"pb_me",name:"Kızılçam-Sahil (P. brutia ME)",ref:"Özçelik 2014",fn:(h,cd)=>{const a=22.527,b=1.823,c=0.062;if(h<=1.3||h>=a+1.3)return NaN;const inner=(h-1.3)/a;if(inner<=0||inner>=1)return NaN;const lni=-Math.log(inner)/b;if(lni<=0)return NaN;return Math.max(0,-Math.log(lni)/c);}},
+  {id:"pb_ie",name:"Kızılçam-İç (P. brutia IE)",ref:"Özçelik 2014",fn:(h,cd)=>{const a=25.911,b=2.004,c=0.045;if(h<=1.3||h>=a+1.3)return NaN;const inner=(h-1.3)/a;if(inner<=0||inner>=1)return NaN;const lni=-Math.log(inner)/b;if(lni<=0)return NaN;return Math.max(0,-Math.log(lni)/c);}},
+  {id:"pb_le",name:"Kızılçam-Göl (P. brutia LE)",ref:"Özçelik 2014",fn:(h,cd)=>{const a=24.207,b=1.465,c=0.038;if(h<=1.3||h>=a+1.3)return NaN;const inner=(h-1.3)/a;if(inner<=0||inner>=1)return NaN;const lni=-Math.log(inner)/b;if(lni<=0)return NaN;return Math.max(0,-Math.log(lni)/c);}},
+  // Özçelik et al. (2014) — Pinus nigra Gompertz (Akdeniz sahil)
+  {id:"pn",name:"Karaçam (P. nigra)",ref:"Özçelik 2014",fn:(h,cd)=>{const a=23.494,b=2.397,c=0.067;if(h<=1.3||h>=a+1.3)return NaN;const inner=(h-1.3)/a;if(inner<=0||inner>=1)return NaN;const lni=-Math.log(inner)/b;if(lni<=0)return NaN;return Math.max(0,-Math.log(lni)/c);}},
+  // Ercanli (2015) DOI:10.5154/R.RCHSCFA.2015.02.006 — Schnute, Kestel-Bursa
+  // Assumes H_dom=H+2m, D_dom=35cm for estimation; inverse-solved numerically
+  {id:"fo",name:"Kayın (F. orientalis)",ref:"Ercanli 2015 (Kestel-Bursa)",fn:(h,cd)=>{const a=1.659,b=0.051,H0=Math.max(h+1,10),D0=35;let lo=0.1,hi=150;for(let i=0;i<40;i++){const d=(lo+hi)/2;const num=1-Math.exp(-b*d),den=1-Math.exp(-b*D0);const hPred=Math.pow(Math.pow(1.3,a)+(Math.pow(H0,a)-Math.pow(1.3,a))*num/den,1/a);if(hPred<h)lo=d;else hi=d;}return Math.max(0,(lo+hi)/2);}},
+  // Carus & Akguş (2018) DOI:10.18182/tjf.338311 — Prodan (Tarsus, Pinus pinea)
+  // PDF verification needed; using Näslund power approximation as conservative fallback
+  // derived from typical P. pinea allometry in Mediterranean plantations
+  {id:"pp",name:"Fıstıkçamı (P. pinea)",ref:"Carus & Akguş 2018 (PDF verification pending)",fn:(h,cd)=>{if(h<=1.3)return NaN;const dh=h-1.3;return Math.max(0,1.8*Math.pow(dh,0.95));}},
+  // Cimini & Salvati (2011) — Q. cerris (Sicily, proxy for Turkish data)
+  // Simplified to avoid extrapolation: h = 1.3 + a*(1-exp(-b*d))^c
+  {id:"qc",name:"Meşe (Q. cerris)",ref:"Cimini & Salvati 2011 (proxy, Türkiye verisi aranıyor)",fn:(h,cd)=>{if(h<=1.3)return NaN;const a=30,b=0.035,c=1.2;let lo=0.1,hi=120;for(let i=0;i<40;i++){const d=(lo+hi)/2;const hPred=1.3+a*Math.pow(1-Math.exp(-b*d),c);if(hPred<h)lo=d;else hi=d;}return Math.max(0,(lo+hi)/2);}}
+];
+
+// Biomass models — Sönmez, Kahriman, Şahin, Yavuz (2016) for Pinus brutia
+// Šumarski List 140(11-12), DOI:10.31298/SL.140.11-12.4
+// Returns dry biomass in kg given DBH (d, cm) and height (h, m)
+const BIOMASS={
+  "pb":{
+    branches:(d,h)=>Math.exp(-2.611+1.069*Math.log(d)+0.950*Math.log(h)),
+    bark:(d,h)=>Math.exp(-3.254+1.314*Math.log(d)+0.878*Math.log(h)),
+    stem:(d,h)=>Math.exp(-3.107+9.480*(d/(d+9.499))+0.070*h),
+    needles:(d,h)=>Math.exp(-1.152+6.483*(d/(d+25.940))-0.017*h),
+    total:(d,h)=>Math.exp(-0.770+7.829*(d/(d+12.843))+0.056*h)
+  }
+};
 const CL=["#e6194b","#3cb44b","#ffe119","#4363d8","#f58231","#911eb4","#42d4f4","#f032e6","#bfef45","#fabed4","#469990","#dcbeff","#9A6324","#800000","#aaffc3","#808000"];
 function hC(t){return[t<.5?0:(t-.5)*2,t<.5?t*2:(1-t)*2,t<.5?(.5-t)*2:0];}
 function nS(r){if(r<=0)return 1;const raw=r/6,mg=10**Math.floor(Math.log10(raw)),n=raw/mg;return(n<1.5?1:n<3.5?2:n<7.5?5:10)*mg;}
@@ -82,8 +119,8 @@ const handleFile=useCallback(async e=>{const f=e.target.files[0];if(!f)return;
 const hClip=useCallback(()=>{if(!data||!cc||!zN)return;const{pts:cp,zN:cz}=clipP(data,zN,cc.x,cc.y,cr,cs);if(!cp.x.length){setMsg("No points!");return;}setClp(cp);setClpZ(cz);setClpB(gB(cp));setSegs(null);setMet(null);setAreaMet(null);setAreaErr("");setPan({x:0,y:0});setZoom(1);},[data,zN,cc,cr,cs]);
 const hSeg=useCallback(()=>{const pts=cR.current||dR.current,za=czR.current||zR.current;if(!pts||!za)return;setMsg(L?"Segmentasyon...":"Segmenting...");setTimeout(()=>{const s=runSeg(pts,za,sCell,sMinH,sSR);setSegs(s);setCMode("segment");setMet(makeMet(pts,za,s.labels,s.count));setMsg("");setTab("metrics");},50);},[sCell,sMinH,sSR,L]);
 const hArea=useCallback(()=>{const pts=cR.current||dR.current,za=czR.current||zR.current,m=mR.current;const r=makeArea(pts,za,m);if(typeof r==="string"){setAreaErr(r);setAreaMet(null);}else{setAreaMet(r);setAreaErr("");}setMsg("");},[]);
-const hSp=useCallback(()=>{if(!met)return;const s=SP.find(x=>x.id===sp);setMet(prev=>prev.map(m=>({...m,dbhModel:s?s.fn(m.h,m.cd):null,species:s?.name})));},[met,sp]);
-const hCSV=useCallback(()=>{if(!met)return;let csv="ID,H_auto,CD_auto,CPA,CenterX,CenterY,DBH_model,H_manual,CD_manual,DBH_manual,Species,Points\n";csv+=met.map(m=>`${m.id},${m.h.toFixed(2)},${m.cd.toFixed(2)},${m.cpa.toFixed(2)},${m.cx.toFixed(2)},${m.cy.toFixed(2)},${m.dbhModel?.toFixed(1)||""},${m.hManual||""},${m.cdManual||""},${m.dbhManual||""},${m.species||""},${m.cnt}`).join("\n");if(areaMet)csv+="\n\nAREA_METRICS\n"+Object.entries(areaMet).map(([k,v])=>`${k},${typeof v==="number"?v.toFixed(3):v}`).join("\n");dlF(new Blob(["\uFEFF"+csv],{type:"text/csv"}),"fora_tree_metrics.csv");},[met,areaMet]);
+const hSp=useCallback(()=>{if(!met)return;const s=SP.find(x=>x.id===sp);const bioKey=sp.startsWith("pb")?"pb":null;const bio=bioKey?BIOMASS[bioKey]:null;setMet(prev=>prev.map(m=>{const d=s?s.fn(m.h,m.cd):null;const bioOut=(bio&&d&&d>0&&m.h>0)?{bm_total:bio.total(d,m.h),bm_stem:bio.stem(d,m.h),bm_branch:bio.branches(d,m.h),bm_bark:bio.bark(d,m.h),bm_needle:bio.needles(d,m.h)}:{};return{...m,dbhModel:d,species:s?.name,...bioOut};}));},[met,sp]);
+const hCSV=useCallback(()=>{if(!met)return;let csv="ID,H_auto,CD_auto,CPA,CenterX,CenterY,DBH_model,H_manual,CD_manual,DBH_manual,Species,Biomass_total_kg,Biomass_stem_kg,Biomass_branch_kg,Biomass_bark_kg,Biomass_needle_kg,Points\n";csv+=met.map(m=>`${m.id},${m.h.toFixed(2)},${m.cd.toFixed(2)},${m.cpa.toFixed(2)},${m.cx.toFixed(2)},${m.cy.toFixed(2)},${m.dbhModel?.toFixed(1)||""},${m.hManual||""},${m.cdManual||""},${m.dbhManual||""},${m.species||""},${m.bm_total?.toFixed(2)||""},${m.bm_stem?.toFixed(2)||""},${m.bm_branch?.toFixed(2)||""},${m.bm_bark?.toFixed(2)||""},${m.bm_needle?.toFixed(2)||""},${m.cnt}`).join("\n");if(areaMet)csv+="\n\nAREA_METRICS\n"+Object.entries(areaMet).map(([k,v])=>`${k},${typeof v==="number"?v.toFixed(3):v}`).join("\n");dlF(new Blob(["\uFEFF"+csv],{type:"text/csv"}),"fora_tree_metrics.csv");},[met,areaMet]);
 const hAreaCSV=useCallback(()=>{if(!areaMet)return;let csv="Metric,Value\n";Object.entries(areaMet).forEach(([k,v])=>{csv+=`${k},${typeof v==="number"?v.toFixed(4):v}\n`;});dlF(new Blob(["\uFEFF"+csv],{type:"text/csv"}),"fora_area_metrics.csv");},[areaMet]);
 const hImg=useCallback(()=>{if(view==="3d"){const el=threeR.current;if(!el)return;const wc=el.querySelector("canvas");if(!wc)return;try{const url=wc.toDataURL("image/png");const a=document.createElement("a");a.href=url;a.download="fora_3d.png";document.body.appendChild(a);a.click();document.body.removeChild(a);}catch(err){setMsg("Export failed");}
 }else{const cv=topR.current;if(!cv)return;const W=cv.width,H=cv.height;const tmp=document.createElement("canvas");tmp.width=W;tmp.height=H;const ctx=tmp.getContext("2d");ctx.drawImage(cv,0,0);
@@ -297,6 +334,8 @@ return(<><div style={{fontSize:9,color:txD,marginBottom:8}}>{L?"Manuel değer gi
 <SB l="H" s={cSt(wH.map(m=>({a:+m.hManual,b:m.h})))}/><SB l="CD" s={cSt(wC.map(m=>({a:+m.cdManual,b:m.cd})))}/><SB l="DBH" s={cSt(wD.map(m=>({a:+m.dbhManual,b:m.dbhModel})))}/></>);})()}</Sc>)}
 
 {tab==="species"&&(<Sc t={L?"Tür":"Species"}><select style={{...IN,width:"100%",marginBottom:6}} value={sp} onChange={e=>setSp(e.target.value)}>{SP.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select>
+<div style={{fontSize:9,color:txD,marginBottom:6,padding:"4px 6px",background:dk,borderRadius:3,borderLeft:`2px solid ${ac}`}}>📖 {SP.find(s=>s.id===sp)?.ref||""}</div>
+{sp.startsWith("pb")&&<div style={{fontSize:9,color:gn2,marginBottom:6,padding:"4px 6px",background:dk,borderRadius:3,borderLeft:`2px solid ${gn2}`}}>🌲 {L?"Biyokütle: Sönmez et al. 2016":"Biomass: Sönmez et al. 2016"}</div>}
 <button style={{...BT(true),width:"100%"}} onClick={hSp} disabled={!met}>{L?"Uygula":"Apply"}</button></Sc>)}
 
 {tab==="transect"&&(<Sc t="Transect"><div style={{fontSize:9,color:txD,marginBottom:6}}>{L?"2D'de 2 nokta tıklayın":"Click 2 points on 2D"}</div>

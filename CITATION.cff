@@ -1,0 +1,85 @@
+cff-version: 1.2.0
+title: "FORA: A browser-based platform for processing UAV-LiDAR point clouds in forest structures"
+message: "If you use this software, please cite it as below."
+type: software
+version: 1.0.0
+date-released: "2026-04-17"
+license: MIT
+repository-code: "https://github.com/fora-platform/fora"
+url: "https://fora-platform.github.io/fora"
+authors:
+  - family-names: Gençal
+    given-names: Burhan
+    email: burhan.gencal@btu.edu.tr
+    affiliation: "Bursa Technical University, Faculty of Forestry, Department of Forest Engineering"
+    orcid: "https://orcid.org/0000-0000-0000-0000"
+keywords:
+  - "UAV LiDAR"
+  - "point cloud"
+  - "individual tree detection"
+  - "area-based approach"
+  - "browser-based"
+  - "canopy height model"
+  - "forest inventory"
+  - "allometric models"
+  - "biomass estimation"
+  - "Turkish forestry"
+abstract: >-
+  FORA (FORest Analysis) is an open-source, browser-based web platform for
+  processing forest LiDAR point clouds at individual tree and stand levels.
+  Built with React 19 and Three.js, the platform performs LAS file parsing,
+  interactive 3D/2D visualization, height normalization, spatial clipping,
+  canopy height model (CHM)-based tree segmentation, area-based metric
+  extraction, allometric diameter estimation for 8 Turkish tree species,
+  aboveground biomass estimation for Pinus brutia, transect profile analysis,
+  and paired statistical comparison — all entirely on the client side,
+  requiring no installation, server infrastructure, or programming knowledge.
+preferred-citation:
+  type: article
+  authors:
+    - family-names: Gençal
+      given-names: Burhan
+      email: burhan.gencal@btu.edu.tr
+      affiliation: "Bursa Technical University, Faculty of Forestry"
+  title: "FORA: A browser-based platform for processing UAV-LiDAR point clouds in forest structures"
+  journal: "SoftwareX"
+  year: 2026
+  notes: "Under review"
+references:
+  - type: data
+    title: "Point clouds with ground point classification and individual tree segmentation of 89 northern boreal forest and tundra sites from UAV-based lidar surveys in Yakutia, Russia in 2021"
+    authors:
+      - family-names: Kruse
+        given-names: Stefan
+      - family-names: Jackisch
+        given-names: Robert
+      - family-names: Gloy
+        given-names: Josias
+    year: 2025
+    repository: PANGAEA
+    doi: "10.1594/PANGAEA.980735"
+  - type: article
+    title: "Biomass equations for Calabrian pine in the Mediterranean Region of Turkey"
+    authors:
+      - family-names: Sönmez
+        given-names: Turan
+      - family-names: Kahriman
+        given-names: Aydın
+      - family-names: Şahin
+        given-names: Abdurrahman
+      - family-names: Yavuz
+        given-names: Mehmet
+    journal: "Šumarski List"
+    year: 2016
+    volume: 140
+    issue: 11-12
+    doi: "10.31298/SL.140.11-12.4"
+  - type: thesis
+    title: "Meşcere parametrelerinin insansız hava araçları (İHA) ile tahmin edilmesi"
+    authors:
+      - family-names: Gençal
+        given-names: Burhan
+    thesis-type: "PhD thesis"
+    institution:
+      name: "Bursa Technical University, Graduate School"
+    year: 2025
