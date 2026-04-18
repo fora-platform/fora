@@ -110,7 +110,7 @@ If you use FORA in your research, please cite:
   version = {1.0.0},
   year    = {2026},
   url     = {https://github.com/fora-platform/fora},
-  doi     = {[Zenodo DOI pending]}
+       = {https://doi.org/10.5281/zenodo.19634971}
 }
 ```
 
