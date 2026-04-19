@@ -62,12 +62,44 @@ const SP=[
   // Ercanli (2015) DOI:10.5154/R.RCHSCFA.2015.02.006 — Schnute, Kestel-Bursa
   // Assumes H_dom=H+2m, D_dom=35cm for estimation; inverse-solved numerically
   {id:"fo",name:"Kayın (F. orientalis)",ref:"Ercanli 2015 (Kestel-Bursa)",fn:(h,cd)=>{const a=1.659,b=0.051,H0=Math.max(h+1,10),D0=35;let lo=0.1,hi=150;for(let i=0;i<40;i++){const d=(lo+hi)/2;const num=1-Math.exp(-b*d),den=1-Math.exp(-b*D0);const hPred=Math.pow(Math.pow(1.3,a)+(Math.pow(H0,a)-Math.pow(1.3,a))*num/den,1/a);if(hPred<h)lo=d;else hi=d;}return Math.max(0,(lo+hi)/2);}},
-  // Carus & Akguş (2018) DOI:10.18182/tjf.338311 — Prodan (Tarsus, Pinus pinea)
-  // EXPERIMENTAL: PDF verification pending; using Näslund power approximation as conservative fallback
-  {id:"pp",name:"Fıstıkçamı (P. pinea) [BETA]",ref:"Carus & Akguş 2018 (PDF verification pending)",experimental:true,fn:(h,cd)=>{if(h<=1.3)return NaN;const dh=h-1.3;return Math.max(0,1.8*Math.pow(dh,0.95));}},
-  // Cimini & Salvati (2011) — Q. cerris (Sicily, proxy for Turkish data)
-  // EXPERIMENTAL: Turkish-calibrated equation pending
-  {id:"qc",name:"Meşe (Q. cerris) [BETA]",ref:"Cimini & Salvati 2011 (proxy — Türkiye verisi aranıyor)",experimental:true,fn:(h,cd)=>{if(h<=1.3)return NaN;const a=30,b=0.035,c=1.2;let lo=0.1,hi=120;for(let i=0;i<40;i++){const d=(lo+hi)/2;const hPred=1.3+a*Math.pow(1-Math.exp(-b*d),c);if(hPred<h)lo=d;else hi=d;}return Math.max(0,(lo+hi)/2);}}
+  // Carus & Akguş (2018) DOI:10.18182/tjf.338311 — Prodan 1968 rational (m8)
+  // h = 1.30 + d² / (a + b·d + c·d²)
+  // Tarsus region afforestation stands, n=5885 trees, Çizelge 4 (model dev dataset)
+  // Verified: d=25.7 → h=8.54 (paper mean 8.4) — PHYSICALLY VALID
+  // Inverse solved numerically via bisection on h
+  {id:"pp",name:"Fıstıkçamı (P. pinea)",ref:"Carus & Akguş 2018 (Tarsus)",fn:(h,cd)=>{
+    if(h<=1.3)return NaN;
+    const a=-8.922602,b=3.254666,c=0.025050;
+    // Find d such that 1.30 + d²/(a + b·d + c·d²) = h
+    let lo=0.5,hi=150;
+    for(let i=0;i<60;i++){
+      const d=(lo+hi)/2;
+      const den=a+b*d+c*d*d;
+      if(den<=0){lo=d;continue;}
+      const hPred=1.30+d*d/den;
+      if(isNaN(hPred)||hPred<h)lo=d;else hi=d;
+    }
+    return Math.max(0,(lo+hi)/2);
+  }},
+  // Cimini & Salvati (2011) — Q. cerris GADA site-index model, central Italy
+  // h = Hdom · [(1-exp(b1·d))^b2 / (1-exp(b1·Ddom))^b2]
+  // b1=-0.046, b2=0.650; defaults Hdom=25m, Ddom=40cm for mature Mediterranean stand
+  // Proxy for Turkish Q. cerris (published Turkish coefs not yet available)
+  {id:"qc",name:"Meşe (Q. cerris) [BETA]",ref:"Cimini & Salvati 2011 (proxy)",experimental:true,fn:(h,cd)=>{
+    if(h<=1.3)return NaN;
+    const b1=-0.046,b2=0.650,Hdom=25,Ddom=40;
+    const den=Math.pow(1-Math.exp(b1*Ddom),b2);
+    // Find d such that Hdom · (1-exp(b1·d))^b2 / den = h
+    let lo=0.5,hi=150;
+    for(let i=0;i<60;i++){
+      const d=(lo+hi)/2;
+      const term=1-Math.exp(b1*d);
+      if(term<=0){lo=d;continue;}
+      const hPred=Hdom*Math.pow(term,b2)/den;
+      if(isNaN(hPred)||hPred<h)lo=d;else hi=d;
+    }
+    return Math.max(0,(lo+hi)/2);
+  }}
 ];
 
 // Biomass models — Sönmez, Kahriman, Şahin, Yavuz (2016) for Pinus brutia
