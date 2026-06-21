@@ -62,8 +62,18 @@ for(let i=0;i<pts.x.length;i++){const px=pts.x[i]-p1.x,py=pts.y[i]-p1.y;const al
 // Pine:      CW = 3.75105 - 0.17919·H + 0.01241·H²
 // Deciduous: CW = 3.09632 + 0.00895·H²
 // Combined:  CW = 2.51503 + 0.00901·H²
-const VWS={pine:{a:3.75105,b:-0.17919,c:0.01241,name:"Pine (P&W 2004 coniferous)"},deciduous:{a:3.09632,b:0,c:0.00895,name:"Deciduous (P&W 2004 broadleaved)"},combined:{a:2.51503,b:0,c:0.00901,name:"Combined (P&W 2004 mixed)"}};
-function vwsRadiusPx(H,cell,coef){if(!isFinite(H)||H<=0)return 1;const cw=coef.a+coef.b*H+coef.c*H*H;return Math.max(1,Math.round((cw/2)/cell));}
+// Linear (boreal-tuned): empirically derived for short-stature boreal taiga,
+//   ws(H) = clamp(0.05·H + 2.5, 2, 5) — outperformed Popescu presets on EN23611_2
+const VWS={
+pine:{a:3.75105,b:-0.17919,c:0.01241,name:"Pine (P&W 2004 coniferous)",linear:false},
+deciduous:{a:3.09632,b:0,c:0.00895,name:"Deciduous (P&W 2004 broadleaved)",linear:false},
+combined:{a:2.51503,b:0,c:0.00901,name:"Combined (P&W 2004 mixed)",linear:false},
+linear_boreal:{a:2.5,b:0.05,c:0,min:2,max:5,name:"Linear (boreal-tuned)",linear:true}
+};
+function vwsRadiusPx(H,cell,coef){if(!isFinite(H)||H<=0)return 1;let cw;
+if(coef.linear){cw=Math.max(coef.min||2,Math.min(coef.max||5,coef.a+coef.b*H));}
+else{cw=coef.a+coef.b*H+coef.c*H*H;}
+return Math.max(1,Math.round((cw/2)/cell));}
 
 // Convex hull — Andrew's monotone chain (O(n log n)), shoelace area, max diameter
 function convexHull(pts){if(pts.length<3)return pts.slice();const s=pts.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]);const cr=(O,A,B)=>(A[0]-O[0])*(B[1]-O[1])-(A[1]-O[1])*(B[0]-O[0]);const lo=[];for(const p of s){while(lo.length>=2&&cr(lo[lo.length-2],lo[lo.length-1],p)<=0)lo.pop();lo.push(p);}const up=[];for(let i=s.length-1;i>=0;i--){const p=s[i];while(up.length>=2&&cr(up[up.length-2],up[up.length-1],p)<=0)up.pop();up.push(p);}lo.pop();up.pop();return lo.concat(up);}
@@ -486,7 +496,7 @@ return(
 <div style={{fontSize:9,color:txM,marginBottom:4,fontWeight:600}}>{L?"Pencere Modu":"Window Mode"}</div>
 <label style={{fontSize:10,color:tx,display:"flex",alignItems:"center",gap:4,marginBottom:3,cursor:"pointer"}}><input type="radio" name="wsMode" checked={!vwsMode} onChange={()=>setVwsMode(false)} style={{margin:0}}/>{L?"Sabit (varsayılan)":"Fixed (default)"}</label>
 <label style={{fontSize:10,color:tx,display:"flex",alignItems:"center",gap:4,marginBottom:3,cursor:"pointer"}}><input type="radio" name="wsMode" checked={vwsMode} onChange={()=>setVwsMode(true)} style={{margin:0}}/>VWS (Popescu & Wynne 2004)</label>
-{vwsMode&&(<select value={vwsPreset} onChange={e=>setVwsPreset(e.target.value)} style={{...IN,width:"100%",marginTop:3}}><option value="pine">Pine / coniferous</option><option value="deciduous">Deciduous / broadleaved</option><option value="combined">Combined (mixed forest)</option></select>)}
+{vwsMode&&(<select value={vwsPreset} onChange={e=>setVwsPreset(e.target.value)} style={{...IN,width:"100%",marginTop:3}}><option value="pine">Pine / coniferous</option><option value="deciduous">Deciduous / broadleaved</option><option value="combined">Combined (mixed forest)</option><option value="linear_boreal">Linear (boreal-tuned, empirical)</option></select>)}
 </div>
 <div style={{marginTop:6,paddingTop:6,borderTop:`1px solid ${bd}`}}>
 <div style={{fontSize:9,color:txM,marginBottom:4,fontWeight:600}}>{L?"Taç Projeksiyon":"Crown Projection"}</div>
