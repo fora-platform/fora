@@ -4,7 +4,7 @@
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)](https://reactjs.org/)
 [![Three.js](https://img.shields.io/badge/Three.js-r128-000000?logo=three.js)](https://threejs.org/)
 
-**FORA** is an open-source, browser-based web platform for processing forest LiDAR point clouds at individual tree and stand levels. All computation runs entirely on the client side — no installation, no server, no programming knowledge required.
+**FORA** is an open-source, browser-based web platform for processing forest LiDAR point clouds at individual tree and stand levels. All computation runs entirely on the client side — no installation, no server, no programming knowledge required, and point cloud data never leaves the user's device.
 
 🌲 **Live demo:** [fora-platform.github.io/fora](https://fora-platform.github.io/fora)
 
@@ -12,18 +12,19 @@
 
 ## Features
 
-- 📂 **LAS file parsing** (versions 1.2–1.4, point data record formats 0–10)
-- 🎨 **Interactive 3D/2D visualization** with WebGL (Three.js)
-- 📏 **Height normalization** using grid-based minimum-Z + gap filling
-- ✂️ **Spatial clipping** (circular or rectangular regions of interest)
-- 🌳 **CHM-based individual tree detection (ITD)** with marker-controlled watershed
-- 📊 **Area-based approach (ABA) metrics**: height percentiles (H5–H99), density ratios (D1–D9), canopy cover (CC₁.₃), variability statistics
-- 🔢 **Allometric DBH estimation** for 8 Turkish tree species with published coefficients
-- 🌿 **Aboveground biomass estimation** for *Pinus brutia* (5 components: stem, branches, bark, needles, total)
-- 📐 **Transect profile analysis**
-- 📈 **Paired statistical comparison** (RMSE, Bias, R², paired t-test)
-- 💾 **Multi-format export** (CSV, PNG)
-- 🌍 **Bilingual UI** (Turkish/English)
+📂 LAS file parsing (versions 1.2–1.4, point data record formats 0–10, incl. correct classification handling for formats 6–10)
+🎨 Interactive 3D/2D visualization with WebGL (Three.js), responsive to window resizing
+📏 Height normalization using grid-based minimum-Z + gap filling, or an external DTM (GeoTIFF, ESRI ASCII grid, or XYZ ground points)
+✂️ Spatial clipping (circular or rectangular regions of interest)
+🌳 CHM-based individual tree detection (ITD) — local maxima seed detection with fixed or variable window size (VWS), followed by height-ranked region growing
+👑 Crown projection — bounding box, convex hull, or concave hull (KNN-based, for reduced crown-area overestimation)
+📊 Area-based approach (ABA) metrics: height percentiles (H5–H99), density ratios (D1–D9), canopy cover (CC₁.₃), and variability statistics (mean, SD, CV, skewness, kurtosis)
+🔢 Allometric DBH estimation for 8 Turkish tree species with published coefficients
+🌿 Aboveground biomass estimation for Pinus brutia (5 components: stem, branches, bark, needles, total)
+📐 Vertical transect profile analysis (with 1.3 m reference line)
+📈 Paired statistical comparison (RMSE, Bias, R², paired t-test)
+💾 Multi-format export (CSV, PNG)
+🌍 Bilingual UI (Turkish/English) — works fully offline after first load
 
 ---
 
@@ -33,6 +34,8 @@
 Just open [fora-platform.github.io/fora](https://fora-platform.github.io/fora) in Chrome, Firefox, Edge, or Safari.
 
 ### Run locally
+Prerequisite: Node.js 18+ (20 LTS recommended)
+
 ```bash
 git clone https://github.com/fora-platform/fora.git
 cd fora
@@ -50,14 +53,14 @@ npm run preview
 
 ## Workflow
 
-1. **Load** a `.las` file (up to ~5 million points in browser)
-2. **Normalize** — heights are computed automatically
-3. **Clip** (optional) — select a circular or rectangular region of interest
-4. **Segment** — run CHM-based tree segmentation (cell 0.5 m, minH 2 m, search radius 3 m by default)
-5. **Metrics** — tree-level metrics appear in a sortable table
-6. **Area** — compute ABA metrics (parameter-invariant, independent of segmentation choices)
-7. **Species** — select a species and apply allometric model to estimate DBH (and biomass for *P. brutia*)
-8. **Export** — download CSV for trees and area metrics, or PNG for maps
+Load a .las file (up to ~5 million points in browser)
+Normalize — heights are computed automatically (grid min-Z or external DTM)
+Clip (optional) — select a circular or rectangular region of interest
+Segment — run CHM-based tree segmentation (cell 0.5 m, minH 2 m, search radius 3 m by default; fixed or variable window)
+Metrics — tree-level metrics (height, crown diameter, crown projection area) appear in a sortable table
+Area — compute ABA metrics (parameter-invariant, independent of segmentation choices)
+Species — select a species and apply an allometric model to estimate DBH (and biomass for P. brutia)
+Export — download CSV for trees and area metrics, or PNG for maps
 
 ---
 
@@ -74,8 +77,10 @@ FORA includes 8 published allometric models for Turkish forest species:
 | *Pinus brutia* LE — lake | Gompertz, a=24.207, b=1.465, c=0.038 | Özçelik et al. (2014) |
 | *Pinus nigra* (Karaçam) | Gompertz, a=23.494, b=2.397, c=0.067 | Özçelik et al. (2014) |
 | *Fagus orientalis* (Doğu kayını) | Schnute, a=1.659, b=0.051 | Ercanli (2015) Kestel-Bursa |
-| *Pinus pinea* (Fıstık çamı) | Power approx. | Carus & Akguş (2018) — PDF verification pending |
-| *Quercus cerris* (Saçlı meşe) | Chapman-Richards (proxy) | Cimini & Salvati (2011) — Turkish source pending |
+| *Pinus pinea* (Fıstık çamı) | Prodan (1968) rational function | Carus & Akguş (2018) — PDF verification pending |
+| *Quercus cerris* (Saçlı meşe) | GADA site-index (proxy) | Cimini & Salvati (2011) — Turkish source pending |
+
+Pure height–diameter models (Gompertz, Schnute, Prodan, GADA) are inverted numerically to estimate DBH from LiDAR-derived height. The Q. cerris model is a non-Turkish proxy pending field calibration and is flagged as BETA in the interface.
 
 **Biomass module** for *Pinus brutia* (Mediterranean Turkey):
 - Sönmez, Kahriman, Şahin, Yavuz (2016), *Šumarski List* 140(11-12)
@@ -107,10 +112,10 @@ If you use FORA in your research, please cite:
 @software{gencal2026fora,
   author  = {Gencal, Burhan},
   title   = {FORA: A browser-based platform for processing UAV-LiDAR point clouds in forest structures},
-  version = {1.0.0},
+  version = {1.7.2},
   year    = {2026},
   url     = {https://github.com/fora-platform/fora},
-       = {https://doi.org/10.5281/zenodo.19634971}
+       = {https://doi.org/10.5281/zenodo.21198292}
 }
 ```
 
@@ -121,17 +126,18 @@ And the accompanying publication (under review):
 
 ## Limitations
 
-- Browser memory constrains processing to approximately 5 million points per session
-- LAZ compressed files are not yet supported — use CloudCompare, lidR, LAStools, or PDAL to convert LAZ to LAS
-- Ground estimation uses simplified grid-minimum approach (not TIN or CSF)
-- Allometric coefficients for *Pinus pinea* and *Quercus cerris* are approximate pending PDF verification and Turkish-source alternatives
-- CHM-based segmentation inherently underperforms point cloud-based methods in multi-layered forests
-
+Browser memory constrains processing to approximately 5 million points per session
+LAZ compressed files are not yet supported — use CloudCompare, lidR, LAStools, or PDAL to convert LAZ to LAS
+Ground estimation defaults to a simplified grid-minimum approach (not TIN or CSF); an external DTM can be supplied for higher accuracy
+External GeoTIFF DTMs must be uncompressed (single-band, strip-based); LZW/DEFLATE-compressed rasters are not yet read
+Allometric coefficients for Quercus cerris are an approximate non-Turkish proxy pending a Turkish-source alternative
+CHM-based segmentation inherently underperforms point cloud-based methods in multi-layered forests
 ---
 
 ## Roadmap
 
 - [ ] LAZ format support via WebAssembly (laz-perf)
+- [ ] Compressed (LZW/DEFLATE) and tiled GeoTIFF DTM support
 - [ ] User-defined allometric equations
 - [ ] Canopy gap analysis
 - [ ] TIN-based DTM with cloth simulation filter (CSF)
