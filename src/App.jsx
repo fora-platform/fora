@@ -260,7 +260,7 @@ function dlF(blob,name){const url=URL.createObjectURL(blob);const a=document.cre
 
 /* ═══ ATIF / CITATION ═══ */
 const FORA_VERSION="1.7.2";
-const FORA_DOI="10.5281/zenodo.20788089";
+const FORA_DOI="10.5281/zenodo.21198292";
 const FORA_REPO="https://github.com/fora-platform/fora";
 const FORA_BIBTEX=`@software{gencal_fora_2026,
   author    = {Gencal, Burhan},
