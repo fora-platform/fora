@@ -6,10 +6,13 @@ function parseLAS(buf){const dv=new DataView(buf);if(String.fromCharCode(dv.getU
 const vM=dv.getUint8(24),vN=dv.getUint8(25),off=dv.getUint32(96,true),fmt=dv.getUint8(104),rec=dv.getUint16(105,true);let n=dv.getUint32(107,true);if(vM===1&&vN>=4&&n===0)n=Number(dv.getBigUint64(247,true));
 const xS=dv.getFloat64(131,true),yS=dv.getFloat64(139,true),zS=dv.getFloat64(147,true),xO=dv.getFloat64(155,true),yO=dv.getFloat64(163,true),zO=dv.getFloat64(171,true);
 const hasRGB=[2,3,5,7,8,10].includes(fmt);let ro=20;if(fmt===3||fmt===5)ro=28;if(fmt>=7)ro=30;
+// LAS 1.4 point formats 6-10: classification moved to byte 16 (byte 15 = classification flags)
+const clOff=fmt>=6?16:15;
+if(rec<20||!isFinite(rec))throw new Error("Invalid LAS: point record length="+rec);
 const M=5e6,step=n>M?Math.ceil(n/M):1,cap=Math.ceil(n/step);
 const x=new Float32Array(cap),y=new Float32Array(cap),z=new Float32Array(cap),r=new Uint8Array(cap),g=new Uint8Array(cap),b=new Uint8Array(cap),it=new Uint16Array(cap),cl=new Uint8Array(cap);let idx=0;
 for(let i=0;i<n&&idx<cap;i+=step){const o=off+i*rec;if(o+20>buf.byteLength)break;x[idx]=dv.getInt32(o,true)*xS+xO;y[idx]=dv.getInt32(o+4,true)*yS+yO;z[idx]=dv.getInt32(o+8,true)*zS+zO;
-it[idx]=dv.getUint16(o+12,true);cl[idx]=dv.getUint8(o+15);if(hasRGB&&o+ro+6<=buf.byteLength){r[idx]=dv.getUint16(o+ro,true)>>8;g[idx]=dv.getUint16(o+ro+2,true)>>8;b[idx]=dv.getUint16(o+ro+4,true)>>8;}idx++;}
+it[idx]=dv.getUint16(o+12,true);cl[idx]=dv.getUint8(o+clOff);if(hasRGB&&o+ro+6<=buf.byteLength){r[idx]=dv.getUint16(o+ro,true)>>8;g[idx]=dv.getUint16(o+ro+2,true)>>8;b[idx]=dv.getUint16(o+ro+4,true)>>8;}idx++;}
 return{nOrig:n,n:idx,ver:`${vM}.${vN}`,format:"LAS",hasRGB,x:x.subarray(0,idx),y:y.subarray(0,idx),z:z.subarray(0,idx),r:r.subarray(0,idx),g:g.subarray(0,idx),b:b.subarray(0,idx),intensity:it.subarray(0,idx),classification:cl.subarray(0,idx)};}
 
 /* ═══ CORE ═══ */
@@ -50,9 +53,10 @@ const h=[];for(let i=0;i<za.length;i++)if(za[i]>0.5&&isFinite(za[i]))h.push(za[i
 h.sort((a,b2)=>a-b2);const n=h.length,p=v=>h[Math.min(n-1,Math.floor(n*v/100))],mn=h.reduce((s,v)=>s+v,0)/n;
 const va=n>1?h.reduce((s,v)=>s+(v-mn)**2,0)/(n-1):0,sd=Math.sqrt(va),cv=mn>0?sd/mn*100:0;
 const m4=h.reduce((s,v)=>s+(v-mn)**4,0)/n,ku=va>0?m4/va**2-3:0;
+const m3=h.reduce((s,v)=>s+(v-mn)**3,0)/n,sk=va>0?m3/va**1.5:0;
 const dr=t=>{let a=0;for(let i=0;i<za.length;i++)if(za[i]>t&&isFinite(za[i]))a++;return za.length>0?a/za.length:0;};
 const bb=gB(pts),area=Math.max((bb.x1-bb.x0)*(bb.y1-bb.y0),1),iN=mets?mets.length:0;
-return{n_pts:pts.x.length,n_veg:n,area,h5:p(5),h25:p(25),h50:p(50),h75:p(75),h95:p(95),h99:p(99),h_mean:mn,h_max:h[n-1],h_sd:sd,cv_h:cv,kurtosis:ku,iqr:p(75)-p(25),variance:va,
+return{n_pts:pts.x.length,n_veg:n,area,h5:p(5),h10:p(10),h25:p(25),h50:p(50),h75:p(75),h90:p(90),h95:p(95),h99:p(99),h_mean:mn,h_max:h[n-1],h_sd:sd,cv_h:cv,skewness:sk,kurtosis:ku,iqr:p(75)-p(25),variance:va,
 d1:dr(p(10)),d3:dr(p(30)),d5:dr(p(50)),d7:dr(p(70)),d9:dr(p(90)),cc13:dr(1.3),itc_n:iN,itc_max:iN>0?Math.max(...mets.map(m=>m.h)):0,itc_min:iN>0?Math.min(...mets.map(m=>m.h)):0,itc_mean:iN>0?mets.reduce((s,m)=>s+m.h,0)/iN:0,density:iN>0?iN/area*10000:0};}
 function exTr(pts,za,p1,p2,w=2){const dx=p2.x-p1.x,dy=p2.y-p1.y,len=Math.sqrt(dx*dx+dy*dy);if(len<.1)return[];const nx=-dy/len,ny=dx/len,res=[];
 for(let i=0;i<pts.x.length;i++){const px=pts.x[i]-p1.x,py=pts.y[i]-p1.y;const al=(px*dx+py*dy)/len,pe=Math.abs(px*nx+py*ny);if(al>=0&&al<=len&&pe<=w/2)res.push({dist:al,zN:za[i]});}res.sort((a,b2)=>a.dist-b2.dist);return res;}
@@ -252,7 +256,21 @@ const BIOMASS={
 const CL=["#e6194b","#3cb44b","#ffe119","#4363d8","#f58231","#911eb4","#42d4f4","#f032e6","#bfef45","#fabed4","#469990","#dcbeff","#9A6324","#800000","#aaffc3","#808000"];
 function hC(t){return[t<.5?0:(t-.5)*2,t<.5?t*2:(1-t)*2,t<.5?(.5-t)*2:0];}
 function nS(r){if(r<=0)return 1;const raw=r/6,mg=10**Math.floor(Math.log10(raw)),n=raw/mg;return(n<1.5?1:n<3.5?2:n<7.5?5:10)*mg;}
-function dlF(blob,name){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);}
+function dlF(blob,name){const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(url),1000);}
+
+/* ═══ ATIF / CITATION ═══ */
+const FORA_VERSION="1.7.2";
+const FORA_DOI="10.5281/zenodo.20788089";
+const FORA_REPO="https://github.com/fora-platform/fora";
+const FORA_BIBTEX=`@software{gencal_fora_2026,
+  author    = {Gencal, Burhan},
+  title     = {{FORA}: A browser-based platform for {UAV-LiDAR} forest point cloud analysis},
+  year      = {2026},
+  version   = {v${FORA_VERSION}},
+  publisher = {Zenodo},
+  doi       = {${FORA_DOI}},
+  url       = {https://doi.org/${FORA_DOI}}
+}`;
 
 export default function App(){
 const[data,setData]=useState(null);const[zN,setZN]=useState(null);const[bnd,setBnd]=useState(null);const[msg,setMsg]=useState("");const[lang,setLang]=useState("EN");
@@ -264,7 +282,7 @@ const[ptSz,setPtSz]=useState(1.5);const[ptPct,setPtPct]=useState(100);const[sCel
 const[vwsMode,setVwsMode]=useState(false);const[vwsPreset,setVwsPreset]=useState("pine");const[crownMode,setCrownMode]=useState("bbox");const[dtmSrc,setDtmSrc]=useState("auto");const[extDTM,setExtDTM]=useState(null);
 const[tab,setTab]=useState("tools");const[theme,setTheme]=useState("dark");const[pan,setPan]=useState({x:0,y:0});const[zoom,setZoom]=useState(1);
 const[tMode,setTMode]=useState(false);const[tP1,setTP1]=useState(null);const[tP2,setTP2]=useState(null);const[tData,setTData]=useState(null);
-const[showLaz,setShowLaz]=useState(true);
+const[showLaz,setShowLaz]=useState(true);const[showCite,setShowCite]=useState(false);const[citeCopied,setCiteCopied]=useState(false);
 const topR=useRef(null),sideR=useRef(null),transR=useRef(null),threeR=useRef(null),cleanR=useRef(null);
 const dragR=useRef({on:false,moved:false,sx:0,sy:0,px:0,py:0});
 const dR=useRef(),zR=useRef(),cR=useRef(),czR=useRef(),mR=useRef();
@@ -344,7 +362,7 @@ drawC(topR.current,true);drawC(sideR.current,false);
 // TRANSECT — ayrı sabit canvas, topR'den bağımsız
 const tc=transR.current;if(tc&&tData&&tData.length>0&&tc.offsetWidth>0){
 const ctx=tc.getContext("2d"),W=tc.width=tc.offsetWidth*2,H=tc.height=tc.offsetHeight*2;ctx.fillStyle=dk;ctx.fillRect(0,0,W,H);
-const mD2=Math.max(...tData.map(p=>p.dist)),mZ=Math.max(...tData.map(p=>p.zN)),pL=50,pRt=20,pT=20,pBt=25;
+let mD2=0,mZ=0;for(const p of tData){if(p.dist>mD2)mD2=p.dist;if(p.zN>mZ)mZ=p.zN;}const pL=50,pRt=20,pT=20,pBt=25;
 const sx=(W-pL-pRt)/Math.max(mD2,1),sz=(H-pT-pBt)/Math.max(mZ,1);
 ctx.strokeStyle="#8B4513";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(pL,H-pBt);ctx.lineTo(W-pRt,H-pBt);ctx.stroke();
 for(let h=0;h<=mZ;h+=2){const y=H-pBt-h*sz;if(y<pT)continue;ctx.strokeStyle="#22d3ee15";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(pL,y);ctx.lineTo(W-pRt,y);ctx.stroke();ctx.fillStyle=txD;ctx.font="11px monospace";ctx.fillText(`${h}m`,5,y+4);}
@@ -357,6 +375,12 @@ if(mZ>1.3){const y=H-pBt-1.3*sz;ctx.strokeStyle="#f5920055";ctx.lineWidth=1;ctx.
 ctx.fillStyle=ac;ctx.font="bold 12px monospace";ctx.fillText(`Transect: ${mD2.toFixed(1)}m | Hmax: ${mZ.toFixed(1)}m | ${tData.length}pts`,pL,14);}
 },[aP,aB,aZ,cc,cr,cs,cMode,segs,ptSz,ptPct,clp,sel,pan,zoom,theme,dk,txD,tP1,tP2,tData]);
 useEffect(()=>{if(view==="2d")draw2D();},[draw2D,view]);
+// Transect canvas, açılma animasyonu (height 0→160) bittikten sonra 0-yükseklikli
+// canvas'a çizildiği için ilk anda boş kalıyordu. Konteyner gerçek yüksekliğe
+// ulaşana kadar rAF ile bekleyip yeniden çiziyoruz (sekme değiştirme gerekmez).
+useEffect(()=>{if(view!=="2d"||!hasTrans)return;let raf,tries=0;
+const tick=()=>{const tc=transR.current;if(tc&&tc.offsetHeight>0){draw2D();return;}if(tries++<30)raf=requestAnimationFrame(tick);};
+raf=requestAnimationFrame(tick);return()=>cancelAnimationFrame(raf);},[hasTrans,tData,view,draw2D]);
 
 /* ═══ 3D ═══ */
 useEffect(()=>{if(view!=="3d"||!aP||!aB)return;const el=threeR.current;if(!el)return;if(cleanR.current){cleanR.current();cleanR.current=null;}
@@ -383,7 +407,7 @@ const oD=e=>{drag=true;px_=e.clientX;py_=e.clientY;};const oM=e=>{if(!drag)retur
 const oU=()=>{drag=false;};const oW=e=>{dist*=e.deltaY>0?1.08:.92;dist=Math.max(range*.05,Math.min(range*6,dist));upC();e.preventDefault();};
 dE.addEventListener("mousedown",oD);dE.addEventListener("mousemove",oM);dE.addEventListener("mouseup",oU);dE.addEventListener("mouseleave",oU);dE.addEventListener("wheel",oW,{passive:false});
 let aId;const an=()=>{aId=requestAnimationFrame(an);ren.render(scene,cam);};an();
-cleanR.current=()=>{cam3D.current={theta,phi,dist};cancelAnimationFrame(aId);dE.removeEventListener("mousedown",oD);dE.removeEventListener("mousemove",oM);dE.removeEventListener("mouseup",oU);dE.removeEventListener("mouseleave",oU);dE.removeEventListener("wheel",oW);geom.dispose();mat.dispose();ren.dispose();if(el.contains(dE))el.removeChild(dE);};
+cleanR.current=()=>{cam3D.current={theta,phi,dist};cancelAnimationFrame(aId);dE.removeEventListener("mousedown",oD);dE.removeEventListener("mousemove",oM);dE.removeEventListener("mouseup",oU);dE.removeEventListener("mouseleave",oU);dE.removeEventListener("wheel",oW);geom.dispose();mat.dispose();ren.dispose();try{ren.forceContextLoss();}catch(_){}if(el.contains(dE))el.removeChild(dE);};
 return()=>{if(cleanR.current){cleanR.current();cleanR.current=null;}};},[view,aP,aB,aZ,cMode,segs,sel,ptSz,ptPct,theme]);
 
 /* ═══ MOUSE ═══ */
@@ -419,7 +443,24 @@ if(!data)return(
 <div><b>LAStools:</b> <code>las2las -i f.laz -o f.las</code></div>
 <div><b>PDAL:</b> <code>pdal translate f.laz f.las</code></div></div>}
 <div style={{color:txD,fontSize:9,marginTop:4}}>LAS 1.2–1.4</div>
-<div style={{display:"flex",gap:8,marginTop:8}}><button style={BT(L)} onClick={()=>setLang("TR")}>TR</button><button style={BT(!L)} onClick={()=>setLang("EN")}>EN</button></div></div>);
+<div style={{display:"flex",gap:8,marginTop:8}}><button style={BT(L)} onClick={()=>setLang("TR")}>TR</button><button style={BT(!L)} onClick={()=>setLang("EN")}>EN</button></div>
+{/* ATIF FOOTER */}
+<div style={{marginTop:18,paddingTop:12,borderTop:`1px solid ${bd}`,maxWidth:420,textAlign:"center"}}>
+<div style={{fontSize:9,color:txM,lineHeight:1.7}}>FORA v{FORA_VERSION} · MIT License · Burhan Gencal</div>
+<div style={{fontSize:9,color:txD,lineHeight:1.7}}>Bursa Technical University, Faculty of Forestry</div>
+<div style={{display:"flex",gap:12,justifyContent:"center",marginTop:6,fontSize:9}}>
+<a href={`https://doi.org/${FORA_DOI}`} target="_blank" rel="noopener noreferrer" style={{color:ac,textDecoration:"none"}}>DOI</a>
+<a href={FORA_REPO} target="_blank" rel="noopener noreferrer" style={{color:ac,textDecoration:"none"}}>GitHub</a>
+<button onClick={()=>setShowCite(s=>!s)} style={{background:"none",border:"none",color:ac,cursor:"pointer",fontSize:9,fontFamily:"inherit",padding:0,textDecoration:"underline"}}>{L?"Atıf":"Cite"}</button>
+</div>
+{showCite&&(<div style={{marginTop:8,padding:8,background:pn2,border:`1px solid ${bd}`,borderRadius:6,textAlign:"left"}}>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+<span style={{fontSize:9,fontWeight:700,color:txM}}>BibTeX</span>
+<button onClick={()=>{navigator.clipboard?.writeText(FORA_BIBTEX).then(()=>{setCiteCopied(true);setTimeout(()=>setCiteCopied(false),1500);});}} style={{...BT(citeCopied),fontSize:9,padding:"2px 8px"}}>{citeCopied?(L?"✓ Kopyalandı":"✓ Copied"):(L?"Kopyala":"Copy")}</button></div>
+<pre style={{fontSize:8,color:tx,margin:0,whiteSpace:"pre-wrap",wordBreak:"break-word",fontFamily:"inherit",lineHeight:1.4}}>{FORA_BIBTEX}</pre>
+<div style={{fontSize:8,color:txD,marginTop:6,lineHeight:1.5}}>{L?"Yazılımı kullanırsanız lütfen yukarıdaki Zenodo kaydına atıf verin. Eşlik eden makale yayımlandığında bu bilgi güncellenecektir.":"If you use this software, please cite the Zenodo record above. This will be updated when the accompanying paper is published."}</div>
+</div>)}
+</div></div>);
 
 return(
 <div style={{fontFamily:"'Geist Mono',monospace",background:dk,color:tx,height:"100vh",display:"flex",flexDirection:"column",overflow:"hidden"}}>
@@ -431,9 +472,9 @@ return(
 {msg&&<span style={{color:og}}>{msg}</span>}<div style={{flex:1}}/>
 <div style={{display:"flex",border:`1px solid ${bd}`,borderRadius:4,overflow:"hidden"}}><button style={{...BT(view==="2d"),borderRadius:0,border:"none",padding:"3px 12px"}} onClick={()=>setView("2d")}>2D</button><button style={{...BT(view==="3d"),borderRadius:0,border:"none",padding:"3px 12px",borderLeft:`1px solid ${bd}`}} onClick={()=>setView("3d")}>3D</button></div>
 <select style={IN} value={cMode} onChange={e=>setCMode(e.target.value)}><option value="height">{L?"Yükseklik":"Height"}</option><option value="normalized">Normalize</option>{aP.hasRGB&&<option value="rgb">RGB</option>}<option value="intensity">{L?"Yoğunluk":"Intensity"}</option>{segs&&<option value="segment">Segment</option>}</select>
-<button style={BT(theme==="light")} onClick={()=>setTheme(t=>t==="dark"?"light":"dark")}>{theme==="dark"?"☀":"🌙"}</button>
+<button aria-label={L?"Tema değiştir":"Toggle theme"} title={L?"Tema değiştir":"Toggle theme"} style={BT(theme==="light")} onClick={()=>setTheme(t=>t==="dark"?"light":"dark")}>{theme==="dark"?"☀":"🌙"}</button>
 <div style={{display:"flex",border:`1px solid ${bd}`,borderRadius:4,overflow:"hidden"}}><button style={{...BT(L),borderRadius:0,border:"none",padding:"3px 8px"}} onClick={()=>setLang("TR")}>TR</button><button style={{...BT(!L),borderRadius:0,border:"none",padding:"3px 8px",borderLeft:`1px solid ${bd}`}} onClick={()=>setLang("EN")}>EN</button></div>
-{clp&&<button style={BT(false)} onClick={hReset}>↩</button>}
+{clp&&<button aria-label={L?"Kırpmayı sıfırla":"Reset clip"} title={L?"Kırpmayı sıfırla":"Reset clip"} style={BT(false)} onClick={hReset}>↩</button>}
 <label style={{...BT(false),cursor:"pointer"}}>{L?"Yeni":"New"}<input type="file" accept=".las,.laz" onChange={handleFile} style={{display:"none"}}/></label></div>
 
 <div style={{flex:1,display:"flex",overflow:"hidden"}}>
@@ -525,9 +566,9 @@ return(
 {!areaMet&&!areaErr&&<div style={{fontSize:10,color:txD}}>{L?"Hesapla butonuna tıklayın":"Click Calculate"}</div>}
 {areaMet&&(<div style={{fontSize:9,color:txM,lineHeight:2}}>
 <div style={{fontSize:10,fontWeight:600,color:ac,marginBottom:4}}>{L?"Persentiller":"Percentiles"}</div>
-{[["H5",areaMet.h5],["H25",areaMet.h25],["H50",areaMet.h50],["H75",areaMet.h75],["H95",areaMet.h95],["H99",areaMet.h99]].map(([k,v])=><div key={k} style={{display:"flex",justifyContent:"space-between"}}><span>{k}</span><span style={{color:tx}}>{v.toFixed(2)} m</span></div>)}
+{[["H5",areaMet.h5],["H10",areaMet.h10],["H25",areaMet.h25],["H50",areaMet.h50],["H75",areaMet.h75],["H90",areaMet.h90],["H95",areaMet.h95],["H99",areaMet.h99]].map(([k,v])=><div key={k} style={{display:"flex",justifyContent:"space-between"}}><span>{k}</span><span style={{color:tx}}>{v.toFixed(2)} m</span></div>)}
 <div style={{fontSize:10,fontWeight:600,color:ac,marginTop:8,marginBottom:4}}>{L?"İstatistik":"Statistics"}</div>
-{[["Mean",areaMet.h_mean,"m"],["Max",areaMet.h_max,"m"],["SD",areaMet.h_sd,"m"],["CV",areaMet.cv_h,"%"],["Kurt",areaMet.kurtosis,""],["IQR",areaMet.iqr,"m"]].map(([k,v,u])=><div key={k} style={{display:"flex",justifyContent:"space-between"}}><span>{k}</span><span style={{color:tx}}>{v.toFixed(2)} {u}</span></div>)}
+{[["Mean",areaMet.h_mean,"m"],["Max",areaMet.h_max,"m"],["SD",areaMet.h_sd,"m"],["CV",areaMet.cv_h,"%"],["Skew",areaMet.skewness,""],["Kurt",areaMet.kurtosis,""],["IQR",areaMet.iqr,"m"]].map(([k,v,u])=><div key={k} style={{display:"flex",justifyContent:"space-between"}}><span>{k}</span><span style={{color:tx}}>{v.toFixed(2)} {u}</span></div>)}
 <div style={{fontSize:10,fontWeight:600,color:ac,marginTop:8,marginBottom:4}}>{L?"Yoğunluk":"Density"}</div>
 {[["D1",areaMet.d1],["D3",areaMet.d3],["D5",areaMet.d5],["D7",areaMet.d7],["D9",areaMet.d9],["CC₁.₃",areaMet.cc13]].map(([k,v])=><div key={k} style={{display:"flex",justifyContent:"space-between"}}><span>{k}</span><span style={{color:tx}}>{(v*100).toFixed(1)}%</span></div>)}
 <div style={{fontSize:10,fontWeight:600,color:ac,marginTop:8,marginBottom:4}}>ITC</div>
@@ -554,7 +595,7 @@ return(<><div style={{fontSize:9,color:txD,marginBottom:8}}>{L?"Manuel değer gi
 {tP1&&!tP2&&<div style={{fontSize:9,color:og}}>P1 ✓</div>}
 {tData&&<div style={{fontSize:9,color:gn2}}>{tData.length} pts</div>}
 <button style={{...BT(false),width:"100%",marginTop:4}} onClick={()=>{setTP1(null);setTP2(null);setTData(null);}}>🗑 {L?"Temizle":"Clear"}</button>
-<div style={{fontSize:8,color:og,marginTop:8,padding:6,background:og+"15",border:`1px solid ${og}44`,borderRadius:4,lineHeight:1.4}}>{L?"ℹ Not: Çizimden sonra transekt görünmüyorsa 3D → 2D sekmelerine geçin (v1.7.2'de düzeltilecek).":"ℹ Tip: After drawing, if the transect doesn't appear, toggle 3D → 2D tabs to refresh (fix planned for v1.7.2)."}</div></Sc>)}
+<div style={{fontSize:8,color:txM,marginTop:8,padding:6,background:ac+"11",border:`1px solid ${ac}33`,borderRadius:4,lineHeight:1.4}}>{L?"ℹ 2D görünümde çizgi boyunca 2 nokta seçin; dikey kanopi profili altta çizilir (1.3 m referans dahil).":"ℹ In 2D view, pick 2 points along a line; the vertical canopy profile is drawn below (incl. 1.3 m reference)."}</div></Sc>)}
 </div></div></div></div>);}
 function Sc({t,children}){return(<div><div style={{fontSize:10,fontWeight:700,color:"#22d3ee",marginBottom:5,letterSpacing:.3,textTransform:"uppercase"}}>{t}</div>{children}</div>);}
 function Rw({l,children}){return(<div style={{display:"flex",alignItems:"center",gap:5,marginBottom:4}}><span style={{fontSize:9,color:"#7b8594",minWidth:60}}>{l}</span>{children}</div>);}
