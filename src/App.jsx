@@ -374,13 +374,15 @@ for(const p of tData){const px=pL+p.dist*sx,py=H-pBt-p.zN*sz,t=mZ>0?p.zN/mZ:0;co
 if(mZ>1.3){const y=H-pBt-1.3*sz;ctx.strokeStyle="#f5920055";ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(pL,y);ctx.lineTo(W-pRt,y);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle="#f59200";ctx.font="10px monospace";ctx.fillText("1.3m",W-pRt+2,y+4);}
 ctx.fillStyle=ac;ctx.font="bold 12px monospace";ctx.fillText(`Transect: ${mD2.toFixed(1)}m | Hmax: ${mZ.toFixed(1)}m | ${tData.length}pts`,pL,14);}
 },[aP,aB,aZ,cc,cr,cs,cMode,segs,ptSz,ptPct,clp,sel,pan,zoom,theme,dk,txD,tP1,tP2,tData]);
-useEffect(()=>{if(view!=="2d")return;const cv=topR.current;
-// İlk yüklemede canvas henüz boyutlanmadan (offsetWidth=0) çizilirse boş kalıyor;
-// bu durumda konteyner ölçülene kadar rAF ile bekleyip çiziyoruz. Boyut hazırsa
-// hiç beklemeden çizeriz (pan/zoom'da ek gecikme olmaz).
-if(cv&&cv.offsetWidth>0){draw2D();return;}
-let raf,tries=0;const tick=()=>{const c=topR.current;if(c&&c.offsetWidth>0){draw2D();return;}if(tries++<30)raf=requestAnimationFrame(tick);};
-raf=requestAnimationFrame(tick);return()=>cancelAnimationFrame(raf);},[draw2D,view]);
+// draw2D'nin en güncel kopyasını observer callback'i için ref'te tutuyoruz
+const draw2DRef=useRef(draw2D);draw2DRef.current=draw2D;
+// State değişimlerinde (pan/zoom/tema/segment...) anında yeniden çiz
+useEffect(()=>{if(view==="2d")draw2D();},[draw2D,view]);
+// Boyut değişimlerinde çiz: ilk yükleme (canvas 0→gerçek boyut) ve pencere yeniden
+// boyutlandırma. ResizeObserver, canvas gerçek boyutuna ulaştığı anda tetiklenir —
+// artık 3D'ye girip çıkmaya gerek yok.
+useEffect(()=>{if(view!=="2d"||typeof ResizeObserver==="undefined")return;const cv=topR.current;if(!cv)return;
+const ro=new ResizeObserver(()=>draw2DRef.current&&draw2DRef.current());ro.observe(cv);return()=>ro.disconnect();},[view]);
 // Transect canvas, açılma animasyonu (height 0→160) bittikten sonra 0-yükseklikli
 // canvas'a çizildiği için ilk anda boş kalıyordu. Konteyner gerçek yüksekliğe
 // ulaşana kadar rAF ile bekleyip yeniden çiziyoruz (sekme değiştirme gerekmez).
