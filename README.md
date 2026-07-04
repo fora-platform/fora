@@ -13,18 +13,31 @@
 ## Features
 
 📂 LAS file parsing (versions 1.2–1.4, point data record formats 0–10, incl. correct classification handling for formats 6–10)
+
 🎨 Interactive 3D/2D visualization with WebGL (Three.js), responsive to window resizing
+
 📏 Height normalization using grid-based minimum-Z + gap filling, or an external DTM (GeoTIFF, ESRI ASCII grid, or XYZ ground points)
+
 ✂️ Spatial clipping (circular or rectangular regions of interest)
+
 🌳 CHM-based individual tree detection (ITD) — local maxima seed detection with fixed or variable window size (VWS), followed by height-ranked region growing
+
 👑 Crown projection — bounding box, convex hull, or concave hull (KNN-based, for reduced crown-area overestimation)
+
 📊 Area-based approach (ABA) metrics: height percentiles (H5–H99), density ratios (D1–D9), canopy cover (CC₁.₃), and variability statistics (mean, SD, CV, skewness, kurtosis)
+
 🔢 Allometric DBH estimation for 8 Turkish tree species with published coefficients
+
 🌿 Aboveground biomass estimation for Pinus brutia (5 components: stem, branches, bark, needles, total)
+
 📐 Vertical transect profile analysis (with 1.3 m reference line)
+
 📈 Paired statistical comparison (RMSE, Bias, R², paired t-test)
+
 💾 Multi-format export (CSV, PNG)
+
 🌍 Bilingual UI (Turkish/English) — works fully offline after first load
+
 
 ---
 
@@ -54,13 +67,21 @@ npm run preview
 ## Workflow
 
 Load a .las file (up to ~5 million points in browser)
+
 Normalize — heights are computed automatically (grid min-Z or external DTM)
+
 Clip (optional) — select a circular or rectangular region of interest
+
 Segment — run CHM-based tree segmentation (cell 0.5 m, minH 2 m, search radius 3 m by default; fixed or variable window)
+
 Metrics — tree-level metrics (height, crown diameter, crown projection area) appear in a sortable table
+
 Area — compute ABA metrics (parameter-invariant, independent of segmentation choices)
+
 Species — select a species and apply an allometric model to estimate DBH (and biomass for P. brutia)
+
 Export — download CSV for trees and area metrics, or PNG for maps
+
 
 ---
 
@@ -127,11 +148,17 @@ And the accompanying publication (under review):
 ## Limitations
 
 Browser memory constrains processing to approximately 5 million points per session
+
 LAZ compressed files are not yet supported — use CloudCompare, lidR, LAStools, or PDAL to convert LAZ to LAS
+
 Ground estimation defaults to a simplified grid-minimum approach (not TIN or CSF); an external DTM can be supplied for higher accuracy
+
 External GeoTIFF DTMs must be uncompressed (single-band, strip-based); LZW/DEFLATE-compressed rasters are not yet read
+
 Allometric coefficients for Quercus cerris are an approximate non-Turkish proxy pending a Turkish-source alternative
+
 CHM-based segmentation inherently underperforms point cloud-based methods in multi-layered forests
+
 ---
 
 ## Roadmap
