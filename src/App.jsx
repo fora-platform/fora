@@ -1,30 +1,40 @@
 import{useState,useRef,useEffect,useCallback}from"react";
 import*as THREE from"three";
 
-/* ═══ LAS PARSER ═══ */
+// --- LAS parser ---
 function parseLAS(buf){const dv=new DataView(buf);if(String.fromCharCode(dv.getUint8(0),dv.getUint8(1),dv.getUint8(2),dv.getUint8(3))!=="LASF")throw new Error("Invalid LAS");
 const vM=dv.getUint8(24),vN=dv.getUint8(25),off=dv.getUint32(96,true),fmt=dv.getUint8(104),rec=dv.getUint16(105,true);let n=dv.getUint32(107,true);if(vM===1&&vN>=4&&n===0)n=Number(dv.getBigUint64(247,true));
 const xS=dv.getFloat64(131,true),yS=dv.getFloat64(139,true),zS=dv.getFloat64(147,true),xO=dv.getFloat64(155,true),yO=dv.getFloat64(163,true),zO=dv.getFloat64(171,true);
 const hasRGB=[2,3,5,7,8,10].includes(fmt);let ro=20;if(fmt===3||fmt===5)ro=28;if(fmt>=7)ro=30;
+// LAS 1.4 point formats 6-10: classification moved to byte 16 (byte 15 = classification flags)
+const clOff=fmt>=6?16:15;
+if(rec<20||!isFinite(rec))throw new Error("Invalid LAS: point record length="+rec);
 const M=5e6,step=n>M?Math.ceil(n/M):1,cap=Math.ceil(n/step);
 const x=new Float32Array(cap),y=new Float32Array(cap),z=new Float32Array(cap),r=new Uint8Array(cap),g=new Uint8Array(cap),b=new Uint8Array(cap),it=new Uint16Array(cap),cl=new Uint8Array(cap);let idx=0;
-for(let i=0;i<n&&idx<cap;i+=step){const o=off+i*rec;if(o+20>buf.byteLength)break;x[idx]=dv.getInt32(o,true)*xS+xO;y[idx]=dv.getInt32(o+4,true)*yS+yO;z[idx]=dv.getInt32(o+8,true)*zS+zO;
-it[idx]=dv.getUint16(o+12,true);cl[idx]=dv.getUint8(o+15);if(hasRGB&&o+ro+6<=buf.byteLength){r[idx]=dv.getUint16(o+ro,true)>>8;g[idx]=dv.getUint16(o+ro+2,true)>>8;b[idx]=dv.getUint16(o+ro+4,true)>>8;}idx++;}
-return{nOrig:n,n:idx,ver:`${vM}.${vN}`,format:"LAS",hasRGB,x:x.subarray(0,idx),y:y.subarray(0,idx),z:z.subarray(0,idx),r:r.subarray(0,idx),g:g.subarray(0,idx),b:b.subarray(0,idx),intensity:it.subarray(0,idx),classification:cl.subarray(0,idx)};}
+// store x/y relative to a double-precision origin so large projected coords
+// keep precision in Float32; origin kept for CSV export and DTM matching
+let ox=null,oy=null;
+for(let i=0;i<n&&idx<cap;i+=step){const o=off+i*rec;if(o+20>buf.byteLength)break;const ax=dv.getInt32(o,true)*xS+xO,ay=dv.getInt32(o+4,true)*yS+yO;if(ox===null){ox=ax;oy=ay;}x[idx]=ax-ox;y[idx]=ay-oy;z[idx]=dv.getInt32(o+8,true)*zS+zO;
+it[idx]=dv.getUint16(o+12,true);cl[idx]=dv.getUint8(o+clOff);if(hasRGB&&o+ro+6<=buf.byteLength){r[idx]=dv.getUint16(o+ro,true)>>8;g[idx]=dv.getUint16(o+ro+2,true)>>8;b[idx]=dv.getUint16(o+ro+4,true)>>8;}idx++;}
+return{nOrig:n,n:idx,ver:`${vM}.${vN}`,format:"LAS",hasRGB,ox:ox||0,oy:oy||0,x:x.subarray(0,idx),y:y.subarray(0,idx),z:z.subarray(0,idx),r:r.subarray(0,idx),g:g.subarray(0,idx),b:b.subarray(0,idx),intensity:it.subarray(0,idx),classification:cl.subarray(0,idx)};}
 
-/* ═══ CORE ═══ */
+// ASPRS classification colours (ground, low/med/high vegetation, building, water)
+const CLS_COL={0:[0.6,0.6,0.6],1:[0.7,0.7,0.7],2:[0.65,0.45,0.25],3:[0.55,0.75,0.35],
+4:[0.35,0.65,0.25],5:[0.15,0.5,0.15],6:[0.8,0.45,0.4],7:[0.9,0.3,0.3],9:[0.25,0.5,0.85]};
+const clsCol=c=>CLS_COL[c]||[0.5,0.5,0.5];
+// --- core ---
 function gB(p){let x0=1/0,x1=-1/0,y0=1/0,y1=-1/0,z0=1/0,z1=-1/0;for(let i=0;i<p.x.length;i++){if(p.x[i]<x0)x0=p.x[i];if(p.x[i]>x1)x1=p.x[i];if(p.y[i]<y0)y0=p.y[i];if(p.y[i]>y1)y1=p.y[i];if(p.z[i]<z0)z0=p.z[i];if(p.z[i]>z1)z1=p.z[i];}return{x0,x1,y0,y1,z0,z1};}
 function makeNorm(pts,cs=2){const b=gB(pts),cols=Math.ceil((b.x1-b.x0)/cs)+1,rows=Math.ceil((b.y1-b.y0)/cs)+1;const gnd=new Float32Array(rows*cols).fill(1/0);
 for(let i=0;i<pts.x.length;i++){const c=Math.floor((pts.x[i]-b.x0)/cs),r=Math.floor((pts.y[i]-b.y0)/cs);if(pts.z[i]<gnd[r*cols+c])gnd[r*cols+c]=pts.z[i];}
 for(let p=0;p<3;p++)for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){if(gnd[r*cols+c]<1/0)continue;let s=0,n=0;for(let dr=-2;dr<=2;dr++)for(let dc=-2;dc<=2;dc++){const nr=r+dr,nc=c+dc;if(nr>=0&&nr<rows&&nc>=0&&nc<cols&&gnd[nr*cols+nc]<1/0){s+=gnd[nr*cols+nc];n++;}}if(n)gnd[r*cols+c]=s/n;}
 const z=new Float32Array(pts.x.length);for(let i=0;i<pts.x.length;i++){const c=Math.floor((pts.x[i]-b.x0)/cs),r=Math.floor((pts.y[i]-b.y0)/cs),v=gnd[r*cols+c];z[i]=v<1/0?pts.z[i]-v:pts.z[i]-b.z0;}return z;}
 function clipP(pts,za,cx,cy,rad,sh){const idx=[];for(let i=0;i<pts.x.length;i++){const dx=pts.x[i]-cx,dy=pts.y[i]-cy;if(sh==="circle"?dx*dx+dy*dy<=rad*rad:Math.abs(dx)<=rad&&Math.abs(dy)<=rad)idx.push(i);}
-const o={x:new Float32Array(idx.length),y:new Float32Array(idx.length),z:new Float32Array(idx.length),r:new Uint8Array(idx.length),g:new Uint8Array(idx.length),b:new Uint8Array(idx.length),intensity:new Uint16Array(idx.length),classification:new Uint8Array(idx.length),hasRGB:pts.hasRGB};const zo=new Float32Array(idx.length);
+const o={x:new Float32Array(idx.length),y:new Float32Array(idx.length),z:new Float32Array(idx.length),r:new Uint8Array(idx.length),g:new Uint8Array(idx.length),b:new Uint8Array(idx.length),intensity:new Uint16Array(idx.length),classification:new Uint8Array(idx.length),hasRGB:pts.hasRGB,ox:pts.ox||0,oy:pts.oy||0};const zo=new Float32Array(idx.length);
 idx.forEach((j,i)=>{o.x[i]=pts.x[j];o.y[i]=pts.y[j];o.z[i]=pts.z[j];o.r[i]=pts.r[j];o.g[i]=pts.g[j];o.b[i]=pts.b[j];o.intensity[i]=pts.intensity[j];o.classification[i]=pts.classification[j];zo[i]=za[j];});return{pts:o,zN:zo};}
-function runSeg(pts,za,cell,minH,sr,vwsMode,vwsPreset){if(!pts.x.length)return{labels:new Int32Array(0),count:0};const b=gB(pts),cols=Math.ceil((b.x1-b.x0)/cell)+1,rows=Math.ceil((b.y1-b.y0)/cell)+1;const chm=new Float32Array(rows*cols).fill(-1);
+function runSeg(pts,za,cell,minH,sr,vwsMode,vwsPreset,customCoef){if(!pts.x.length)return{labels:new Int32Array(0),count:0};const b=gB(pts),cols=Math.ceil((b.x1-b.x0)/cell)+1,rows=Math.ceil((b.y1-b.y0)/cell)+1;const chm=new Float32Array(rows*cols).fill(-1);
 for(let i=0;i<pts.x.length;i++){const c=Math.floor((pts.x[i]-b.x0)/cell),r=Math.floor((pts.y[i]-b.y0)/cell);if(za[i]>chm[r*cols+c])chm[r*cols+c]=za[i];}
 const sm=new Float32Array(rows*cols);for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){let s=0,n=0;for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){const nr=r+dr,nc=c+dc;if(nr>=0&&nr<rows&&nc>=0&&nc<cols&&chm[nr*cols+nc]>=0){s+=chm[nr*cols+nc];n++;}}sm[r*cols+c]=n?s/n:-1;}
-const coef=vwsMode?(VWS[vwsPreset]||VWS.pine):null;const sc=Math.ceil(sr/cell),seeds=[];for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const h=sm[r*cols+c];if(h<minH)continue;
+const coef=vwsMode?(vwsPreset==="custom"&&customCoef?customCoef:(VWS[vwsPreset]||VWS.pine)):null;const sc=Math.ceil(sr/cell),seeds=[];for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const h=sm[r*cols+c];if(h<minH)continue;
 const r2=coef?vwsRadiusPx(h,cell,coef):sc;let mx=true;for(let dr=-r2;dr<=r2&&mx;dr++)for(let dc=-r2;dc<=r2&&mx;dc++){if(!dr&&!dc)continue;const nr=r+dr,nc=c+dc;if(nr>=0&&nr<rows&&nc>=0&&nc<cols&&sm[nr*cols+nc]>h)mx=false;}if(mx)seeds.push({r,c,h});}
 if(!seeds.length)return{labels:new Int32Array(pts.x.length),count:0};const cl2=new Int32Array(rows*cols);seeds.forEach((s,i)=>{cl2[s.r*cols+s.c]=i+1;});
 const ord=[];for(let r=0;r<rows;r++)for(let c=0;c<cols;c++)if(sm[r*cols+c]>=minH)ord.push({r,c,h:sm[r*cols+c]});ord.sort((a,b2)=>b2.h-a.h);
@@ -40,19 +50,27 @@ let cd=cdBbox,cpa=cpaBbox,cdConvex=null,cpaConvex=null,cdConcave=null,cpaConcave
 const samplePts=tpts.length>500?tpts.filter((_,i)=>i%Math.ceil(tpts.length/500)===0):tpts;
 if((crownMode==="convex"||crownMode==="concave")&&samplePts.length>=3){const hull=convexHull(samplePts);cpaConvex=polyArea(hull);cdConvex=hullMaxD(hull);}
 if(crownMode==="concave"&&samplePts.length>=4){const ch=concaveHull(samplePts,3);if(ch&&ch.length>=3){const a=polyArea(ch);
-// Sanity check: concave hull area MUST be <= convex hull area (geometric invariant)
+// concave hull area can't exceed convex hull area; clamp if it does
 if(cpaConvex&&a>cpaConvex*1.01){cd=cdConvex;cpa=cpaConvex;actualMode="convex_fallback_invalid_concave";}
 else{cpaConcave=a;cdConcave=hullMaxD(ch);cd=cdConcave;cpa=cpaConcave;}}else{cd=cdConvex;cpa=cpaConvex;actualMode="convex_fallback";}}
 else if(crownMode==="convex"){cd=cdConvex;cpa=cpaConvex;}
-trees.push({id:t,cnt:c,h:hM,cd:cd,cpa:cpa,cdBbox:cdBbox,cpaBbox:cpaBbox,cdConvex:cdConvex,cpaConvex:cpaConvex,cdConcave:cdConcave,cpaConcave:cpaConcave,crownMethod:actualMode,cx:(x0+x1)/2,cy:(y0+y1)/2,dbhManual:"",hManual:"",cdManual:""});}trees.sort((a,b2)=>b2.cnt-a.cnt);return trees;}
-function makeArea(pts,za,mets){if(!pts||!za)return"E1";if(pts.x.length<10)return"E2";if(za.length!==pts.x.length)return"E3";
+// absolute centre coords (origin + relative) for CSV export and DTM matching
+const _ox=pts.ox||0,_oy=pts.oy||0;
+trees.push({id:t,cnt:c,h:hM,cd:cd,cpa:cpa,cdBbox:cdBbox,cpaBbox:cpaBbox,cdConvex:cdConvex,cpaConvex:cpaConvex,cdConcave:cdConcave,cpaConcave:cpaConcave,crownMethod:actualMode,cx:_ox+(x0+x1)/2,cy:_oy+(y0+y1)/2,cxRel:(x0+x1)/2,cyRel:(y0+y1)/2,dbhManual:"",hManual:"",cdManual:""});}trees.sort((a,b2)=>b2.cnt-a.cnt);return trees;}
+function makeArea(pts,za,mets,roi){if(!pts||!za)return"E1";if(pts.x.length<10)return"E2";if(za.length!==pts.x.length)return"E3";
 const h=[];for(let i=0;i<za.length;i++)if(za[i]>0.5&&isFinite(za[i]))h.push(za[i]);if(h.length<5)return"E4:"+h.length;
 h.sort((a,b2)=>a-b2);const n=h.length,p=v=>h[Math.min(n-1,Math.floor(n*v/100))],mn=h.reduce((s,v)=>s+v,0)/n;
 const va=n>1?h.reduce((s,v)=>s+(v-mn)**2,0)/(n-1):0,sd=Math.sqrt(va),cv=mn>0?sd/mn*100:0;
 const m4=h.reduce((s,v)=>s+(v-mn)**4,0)/n,ku=va>0?m4/va**2-3:0;
+const m3=h.reduce((s,v)=>s+(v-mn)**3,0)/n,sk=va>0?m3/va**1.5:0;
 const dr=t=>{let a=0;for(let i=0;i<za.length;i++)if(za[i]>t&&isFinite(za[i]))a++;return za.length>0?a/za.length:0;};
-const bb=gB(pts),area=Math.max((bb.x1-bb.x0)*(bb.y1-bb.y0),1),iN=mets?mets.length:0;
-return{n_pts:pts.x.length,n_veg:n,area,h5:p(5),h25:p(25),h50:p(50),h75:p(75),h95:p(95),h99:p(99),h_mean:mn,h_max:h[n-1],h_sd:sd,cv_h:cv,kurtosis:ku,iqr:p(75)-p(25),variance:va,
+// use the real ROI area for density (circle -> pi*r^2), else the bounding box
+const bb=gB(pts);let area;let areaSrc;
+if(roi&&roi.shape==="circle"&&roi.r>0){area=Math.PI*roi.r*roi.r;areaSrc="circle";}
+else if(roi&&roi.shape==="rect"&&roi.r>0){area=(2*roi.r)*(2*roi.r);areaSrc="rect";}
+else{area=Math.max((bb.x1-bb.x0)*(bb.y1-bb.y0),1);areaSrc="bbox";}
+area=Math.max(area,1);const iN=mets?mets.length:0;
+return{n_pts:pts.x.length,n_veg:n,area,area_source:areaSrc,h5:p(5),h10:p(10),h25:p(25),h50:p(50),h75:p(75),h90:p(90),h95:p(95),h99:p(99),h_mean:mn,h_max:h[n-1],h_sd:sd,cv_h:cv,skewness:sk,kurtosis:ku,iqr:p(75)-p(25),variance:va,
 d1:dr(p(10)),d3:dr(p(30)),d5:dr(p(50)),d7:dr(p(70)),d9:dr(p(90)),cc13:dr(1.3),itc_n:iN,itc_max:iN>0?Math.max(...mets.map(m=>m.h)):0,itc_min:iN>0?Math.min(...mets.map(m=>m.h)):0,itc_mean:iN>0?mets.reduce((s,m)=>s+m.h,0)/iN:0,density:iN>0?iN/area*10000:0};}
 function exTr(pts,za,p1,p2,w=2){const dx=p2.x-p1.x,dy=p2.y-p1.y,len=Math.sqrt(dx*dx+dy*dy);if(len<.1)return[];const nx=-dy/len,ny=dx/len,res=[];
 for(let i=0;i<pts.x.length;i++){const px=pts.x[i]-p1.x,py=pts.y[i]-p1.y;const al=(px*dx+py*dy)/len,pe=Math.abs(px*nx+py*ny);if(al>=0&&al<=len&&pe<=w/2)res.push({dist:al,zN:za[i]});}res.sort((a,b2)=>a.dist-b2.dist);return res;}
@@ -70,6 +88,11 @@ deciduous:{a:3.09632,b:0,c:0.00895,name:"Deciduous (P&W 2004 broadleaved)",linea
 combined:{a:2.51503,b:0,c:0.00901,name:"Combined (P&W 2004 mixed)",linear:false},
 linear_boreal:{a:2.5,b:0.05,c:0,min:2,max:5,name:"Linear (boreal-tuned)",linear:true}
 };
+// build a VWS coefficient object from user-entered custom values
+// quad: CW = a + b*H + c*H^2   linear: CW = clamp(a + b*H, min, max)
+function customVWS(cc){const lin=cc.mode==="linear";return lin
+?{a:+cc.a,b:+cc.b,c:0,min:+cc.min,max:+cc.max,name:"Custom (linear)",linear:true}
+:{a:+cc.a,b:+cc.b,c:+cc.c,name:"Custom (quadratic)",linear:false};}
 function vwsRadiusPx(H,cell,coef){if(!isFinite(H)||H<=0)return 1;let cw;
 if(coef.linear){cw=Math.max(coef.min||2,Math.min(coef.max||5,coef.a+coef.b*H));}
 else{cw=coef.a+coef.b*H+coef.c*H*H;}
@@ -173,7 +196,7 @@ const f=new Float32Array(nc*nr);for(let i=0;i<f.length;i++)f[i]=cnt[i]>0?sum[i]/
 // 3-pass NN gap fill
 for(let pass=0;pass<3;pass++){const cp=f.slice();for(let y=0;y<nr;y++)for(let x=0;x<nc;x++){const k=y*nc+x;if(isFinite(f[k]))continue;let s=0,c=0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=nc||yy>=nr)continue;const v=cp[yy*nc+xx];if(isFinite(v)){s+=v;c++;}}if(c>0)f[k]=s/c;}}
 return{w:nc,h:nr,oX:mnX,oY:mxY,px:cs,py:cs,data:f};}
-function normWithDTM(pts,dtm){const N=pts.x.length,out=new Float32Array(N);for(let i=0;i<N;i++){const px=(pts.x[i]-dtm.oX)/dtm.px,py=(dtm.oY-pts.y[i])/dtm.py,x0=Math.floor(px),y0=Math.floor(py),x1=x0+1,y1=y0+1;
+function normWithDTM(pts,dtm){const N=pts.x.length,out=new Float32Array(N),ox=pts.ox||0,oy=pts.oy||0;for(let i=0;i<N;i++){const ax=ox+pts.x[i],ay=oy+pts.y[i];const px=(ax-dtm.oX)/dtm.px,py=(dtm.oY-ay)/dtm.py,x0=Math.floor(px),y0=Math.floor(py),x1=x0+1,y1=y0+1;
 // Edge fallback: nearest cell within bounds
 if(x0<0||y0<0||x1>=dtm.w||y1>=dtm.h){const xn=Math.max(0,Math.min(dtm.w-1,Math.round(px))),yn=Math.max(0,Math.min(dtm.h-1,Math.round(py)));const v=dtm.data[yn*dtm.w+xn];out[i]=isFinite(v)?pts.z[i]-v:NaN;continue;}
 const dx=px-x0,dy=py-y0,w=dtm.w,v00=dtm.data[y0*w+x0],v10=dtm.data[y0*w+x1],v01=dtm.data[y1*w+x0],v11=dtm.data[y1*w+x1];
@@ -252,7 +275,21 @@ const BIOMASS={
 const CL=["#e6194b","#3cb44b","#ffe119","#4363d8","#f58231","#911eb4","#42d4f4","#f032e6","#bfef45","#fabed4","#469990","#dcbeff","#9A6324","#800000","#aaffc3","#808000"];
 function hC(t){return[t<.5?0:(t-.5)*2,t<.5?t*2:(1-t)*2,t<.5?(.5-t)*2:0];}
 function nS(r){if(r<=0)return 1;const raw=r/6,mg=10**Math.floor(Math.log10(raw)),n=raw/mg;return(n<1.5?1:n<3.5?2:n<7.5?5:10)*mg;}
-function dlF(blob,name){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);}
+function dlF(blob,name){const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(url),1000);}
+
+// --- citation ---
+const FORA_VERSION="1.8.0";
+const FORA_DOI="10.5281/zenodo.20788089";
+const FORA_REPO="https://github.com/fora-platform/fora";
+const FORA_BIBTEX=`@software{gencal_fora_2026,
+  author    = {Gencal, Burhan},
+  title     = {{FORA}: A browser-based platform for {UAV-LiDAR} forest point cloud analysis},
+  year      = {2026},
+  version   = {v${FORA_VERSION}},
+  publisher = {Zenodo},
+  doi       = {${FORA_DOI}},
+  url       = {https://doi.org/${FORA_DOI}}
+}`;
 
 export default function App(){
 const[data,setData]=useState(null);const[zN,setZN]=useState(null);const[bnd,setBnd]=useState(null);const[msg,setMsg]=useState("");const[lang,setLang]=useState("EN");
@@ -262,9 +299,10 @@ const[segs,setSegs]=useState(null);const[met,setMet]=useState(null);const[areaMe
 const[sel,setSel]=useState(null);const[sp,setSp]=useState("ps");const[cMode,setCMode]=useState("height");const[view,setView]=useState("2d");
 const[ptSz,setPtSz]=useState(1.5);const[ptPct,setPtPct]=useState(100);const[sCell,setSCell]=useState(0.5);const[sMinH,setSMinH]=useState(2);const[sSR,setSSR]=useState(3);
 const[vwsMode,setVwsMode]=useState(false);const[vwsPreset,setVwsPreset]=useState("pine");const[crownMode,setCrownMode]=useState("bbox");const[dtmSrc,setDtmSrc]=useState("auto");const[extDTM,setExtDTM]=useState(null);
+const[vwsCustom,setVwsCustom]=useState({mode:"linear",a:2.5,b:0.05,c:0,min:2,max:5});
 const[tab,setTab]=useState("tools");const[theme,setTheme]=useState("dark");const[pan,setPan]=useState({x:0,y:0});const[zoom,setZoom]=useState(1);
 const[tMode,setTMode]=useState(false);const[tP1,setTP1]=useState(null);const[tP2,setTP2]=useState(null);const[tData,setTData]=useState(null);
-const[showLaz,setShowLaz]=useState(true);
+const[showLaz,setShowLaz]=useState(true);const[showCite,setShowCite]=useState(false);const[citeCopied,setCiteCopied]=useState(false);
 const topR=useRef(null),sideR=useRef(null),transR=useRef(null),threeR=useRef(null),cleanR=useRef(null);
 const dragR=useRef({on:false,moved:false,sx:0,sy:0,px:0,py:0});
 const dR=useRef(),zR=useRef(),cR=useRef(),czR=useRef(),mR=useRef();
@@ -303,21 +341,24 @@ const handleDTM=useCallback(async e=>{const f=e.target.files[0];if(!f)return;set
     setExtDTM(dtm);setDtmSrc("external");setMsg(L?`✓ DTM yüklendi (${dtm.w}×${dtm.h} hücre)`:`✓ DTM loaded (${dtm.w}×${dtm.h} cells)`);
   }catch(err){setMsg("⚠ DTM: "+err.message);}},[L]);
 const hClip=useCallback(()=>{if(!data||!cc||!zN)return;const{pts:cp,zN:cz}=clipP(data,zN,cc.x,cc.y,cr,cs);if(!cp.x.length){setMsg("No points!");return;}setClp(cp);setClpZ(cz);setClpB(gB(cp));setSegs(null);setMet(null);setAreaMet(null);setAreaErr("");setPan({x:0,y:0});setZoom(1);},[data,zN,cc,cr,cs]);
-const hSeg=useCallback(()=>{const pts=cR.current||dR.current,za=czR.current||zR.current;if(!pts||!za)return;setMsg(L?"Segmentasyon...":"Segmenting...");setTimeout(()=>{const s=runSeg(pts,za,sCell,sMinH,sSR,vwsMode,vwsPreset);setSegs(s);setCMode("segment");setMet(makeMet(pts,za,s.labels,s.count,crownMode));setMsg("");setTab("metrics");},50);},[sCell,sMinH,sSR,vwsMode,vwsPreset,crownMode,L]);
-const hArea=useCallback(()=>{const pts=cR.current||dR.current,za=czR.current||zR.current,m=mR.current;const r=makeArea(pts,za,m);if(typeof r==="string"){setAreaErr(r);setAreaMet(null);}else{setAreaMet(r);setAreaErr("");}setMsg("");},[]);
+const hSeg=useCallback(()=>{const pts=cR.current||dR.current,za=czR.current||zR.current;if(!pts||!za)return;setMsg(L?"Segmentasyon...":"Segmenting...");setTimeout(()=>{const cCoef=vwsPreset==="custom"?customVWS(vwsCustom):null;const s=runSeg(pts,za,sCell,sMinH,sSR,vwsMode,vwsPreset,cCoef);setSegs(s);setCMode("segment");setMet(makeMet(pts,za,s.labels,s.count,crownMode));setMsg("");setTab("metrics");},50);},[sCell,sMinH,sSR,vwsMode,vwsPreset,vwsCustom,crownMode,L]);
+const hArea=useCallback(()=>{const pts=cR.current||dR.current,za=czR.current||zR.current,m=mR.current;
+// pass ROI geometry so density uses the true area, not the bounding box
+const roi=(clp&&cc)?{shape:cs,r:cr}:null;
+const r=makeArea(pts,za,m,roi);if(typeof r==="string"){setAreaErr(r);setAreaMet(null);}else{setAreaMet(r);setAreaErr("");}setMsg("");},[clp,cc,cs,cr]);
 const hSp=useCallback(()=>{if(!met)return;const s=SP.find(x=>x.id===sp);const bioKey=sp.startsWith("pb")?"pb":null;const bio=bioKey?BIOMASS[bioKey]:null;setMet(prev=>prev.map(m=>{const d=s?s.fn(m.h,m.cd):null;const bioOut=(bio&&d&&d>0&&m.h>0)?{bm_total:bio.total(d,m.h),bm_stem:bio.stem(d,m.h),bm_branch:bio.branches(d,m.h),bm_bark:bio.bark(d,m.h),bm_needle:bio.needles(d,m.h)}:{};return{...m,dbhModel:d,species:s?.name,...bioOut};}));},[met,sp]);
 const hCSV=useCallback(()=>{if(!met)return;let csv="ID,H_auto,CD_auto,CPA,CD_bbox,CD_convex,CD_concave,CPA_bbox,CPA_convex,CPA_concave,CrownMethod,CenterX,CenterY,DBH_model,H_manual,CD_manual,DBH_manual,Species,Biomass_total_kg,Biomass_stem_kg,Biomass_branch_kg,Biomass_bark_kg,Biomass_needle_kg,Points\n";csv+=met.map(m=>`${m.id},${m.h.toFixed(2)},${m.cd.toFixed(2)},${m.cpa.toFixed(2)},${m.cdBbox?.toFixed(2)||""},${m.cdConvex?.toFixed(2)||""},${m.cdConcave?.toFixed(2)||""},${m.cpaBbox?.toFixed(2)||""},${m.cpaConvex?.toFixed(2)||""},${m.cpaConcave?.toFixed(2)||""},${m.crownMethod||""},${m.cx.toFixed(2)},${m.cy.toFixed(2)},${m.dbhModel?.toFixed(1)||""},${m.hManual||""},${m.cdManual||""},${m.dbhManual||""},${m.species||""},${m.bm_total?.toFixed(2)||""},${m.bm_stem?.toFixed(2)||""},${m.bm_branch?.toFixed(2)||""},${m.bm_bark?.toFixed(2)||""},${m.bm_needle?.toFixed(2)||""},${m.cnt}`).join("\n");if(areaMet)csv+="\n\nAREA_METRICS\n"+Object.entries(areaMet).map(([k,v])=>`${k},${typeof v==="number"?v.toFixed(3):v}`).join("\n");dlF(new Blob(["\uFEFF"+csv],{type:"text/csv"}),"fora_tree_metrics.csv");},[met,areaMet]);
 const hAreaCSV=useCallback(()=>{if(!areaMet)return;let csv="Metric,Value\n";Object.entries(areaMet).forEach(([k,v])=>{csv+=`${k},${typeof v==="number"?v.toFixed(4):v}\n`;});dlF(new Blob(["\uFEFF"+csv],{type:"text/csv"}),"fora_area_metrics.csv");},[areaMet]);
 const hImg=useCallback(()=>{if(view==="3d"){const el=threeR.current;if(!el)return;const wc=el.querySelector("canvas");if(!wc)return;try{const url=wc.toDataURL("image/png");const a=document.createElement("a");a.href=url;a.download="fora_3d.png";document.body.appendChild(a);a.click();document.body.removeChild(a);}catch(err){setMsg("Export failed");}
 }else{const cv=topR.current;if(!cv)return;const W=cv.width,H=cv.height;const tmp=document.createElement("canvas");tmp.width=W;tmp.height=H;const ctx=tmp.getContext("2d");ctx.drawImage(cv,0,0);
 const m=mR.current;if(m&&m.length>0&&cv._tr){const{oX,oY,sc,xMn,yMn}=cv._tr;const isDk=theme==="dark";ctx.font="bold 16px monospace";ctx.textAlign="center";ctx.textBaseline="middle";
-m.forEach(t=>{const px=oX+(t.cx-xMn)*sc,py=oY-(t.cy-yMn)*sc;if(px<0||px>W||py<0||py>H)return;ctx.fillStyle=isDk?"#000000cc":"#ffffffcc";ctx.beginPath();ctx.arc(px,py,12,0,Math.PI*2);ctx.fill();ctx.fillStyle=isDk?"#ffffff":"#000000";ctx.fillText(t.id,px,py);});}
+m.forEach(t=>{const rx=t.cxRel!==undefined?t.cxRel:t.cx,ry=t.cyRel!==undefined?t.cyRel:t.cy;const px=oX+(rx-xMn)*sc,py=oY-(ry-yMn)*sc;if(px<0||px>W||py<0||py>H)return;ctx.fillStyle=isDk?"#000000cc":"#ffffffcc";ctx.beginPath();ctx.arc(px,py,12,0,Math.PI*2);ctx.fill();ctx.fillStyle=isDk?"#ffffff":"#000000";ctx.fillText(t.id,px,py);});}
 ctx.font="bold 18px monospace";ctx.fillStyle=ac;ctx.textAlign="left";ctx.textBaseline="top";ctx.fillText("FORA",10,10);tmp.toBlob(blob=>{if(blob)dlF(blob,"fora_map.png");},"image/png");}},[view,theme]);
 const uMet=useCallback((id,f,v)=>{setMet(prev=>prev.map(m=>m.id===id?{...m,[f]:v}:m));},[]);
 const hReset=()=>{setClp(null);setClpZ(null);setClpB(null);setSegs(null);setMet(null);setAreaMet(null);setAreaErr("");setCC(null);setSel(null);setCMode("height");setPan({x:0,y:0});setZoom(1);setTP1(null);setTP2(null);setTData(null);};
 const cSt=useCallback(pairs=>{if(!pairs||pairs.length<3)return null;const n=pairs.length,df=n-1,diffs=pairs.map(p=>p.a-p.b),mD=diffs.reduce((s,v)=>s+v,0)/n,rmse=Math.sqrt(diffs.reduce((s,v)=>s+v*v,0)/n);const mA=pairs.reduce((s,p)=>s+p.a,0)/n,mB=pairs.reduce((s,p)=>s+p.b,0)/n;let sAB=0,sAA=0,sBB=0;pairs.forEach(p=>{sAB+=(p.a-mA)*(p.b-mB);sAA+=(p.a-mA)**2;sBB+=(p.b-mB)**2;});const r2=sAA>0&&sBB>0?(sAB/(Math.sqrt(sAA)*Math.sqrt(sBB)))**2:0;const se=Math.sqrt(diffs.reduce((s,v)=>s+(v-mD)**2,0)/(n*(n-1)));const ts=se>0?mD/se:0;const ax=Math.abs(ts),tt=1/(1+.2316419*ax),nd=.3989422804*Math.exp(-ax*ax/2),pt=nd*tt*(.3193815+tt*(-.3565638+tt*(1.781478+tt*(-1.821256+tt*1.330274)))),cf=df<30?1+1/(4*df)+(1+2*ax*ax)/(16*df*df):1,pv=Math.min(1,2*pt*cf);return{n,rmse:rmse.toFixed(2),bias:mD.toFixed(2),r2:r2.toFixed(3),t:ts.toFixed(2),p:pv<.001?"<0.001":pv.toFixed(3)};},[]); 
 
-/* ═══ DRAW 2D — topR boyutu ASLA değişmez ═══ */
+// --- draw 2D (topR size stays fixed) ---
 const draw2D=useCallback(()=>{if(!aP||!aB)return;
 const drawC=(cv,isTop)=>{if(!cv||!cv.offsetWidth)return;const ctx=cv.getContext("2d");const W=cv.width=cv.offsetWidth*2,H=cv.height=cv.offsetHeight*2;ctx.fillStyle=dk;ctx.fillRect(0,0,W,H);
 const xA=aP.x,yA=isTop?aP.y:aP.z,xMn=aB.x0,xMx=aB.x1,yMn=isTop?aB.y0:aB.z0,yMx=isTop?aB.y1:aB.z1,rX=xMx-xMn||1,rY=yMx-yMn||1,bsc=Math.min((W-50)/rX,(H-50)/rY),sc=bsc*zoom;
@@ -334,6 +375,7 @@ if(cMode==="rgb"&&aP.hasRGB)ctx.fillStyle=`rgb(${aP.r[i]},${aP.g[i]},${aP.b[i]})
 else if(cMode==="segment"&&segs){const l=segs.labels[i];ctx.fillStyle=l<=0?(theme==="dark"?"#151a22":"#ddd"):CL[(l-1)%CL.length];}
 else if(cMode==="normalized"&&aZ){const t=Math.min(1,aZ[i]/30);const[cr2,cg,cb]=hC(t);ctx.fillStyle=`rgb(${cr2*255|0},${cg*255|0},${cb*255|0})`;}
 else if(cMode==="intensity"){const v=Math.min(255,aP.intensity[i]);ctx.fillStyle=`rgb(${v},${v},${v})`;}
+else if(cMode==="classification"){const[cr2,cg,cb]=clsCol(aP.classification[i]);ctx.fillStyle=`rgb(${cr2*255|0},${cg*255|0},${cb*255|0})`;}
 else{const t=aB.z1===aB.z0?.5:(aP.z[i]-aB.z0)/(aB.z1-aB.z0);const[cr2,cg,cb]=hC(t);ctx.fillStyle=`rgb(${cr2*255|0},${cg*255|0},${cb*255|0})`;}
 ctx.fillRect(px,py,ptSz,ptSz);}
 if(!clp&&cc&&isTop){const cx2=oX+(cc.x-xMn)*sc,cy2=oY-(cc.y-yMn)*sc,r2=cr*sc;ctx.shadowColor="#00ffff";ctx.shadowBlur=12;ctx.strokeStyle="#00ffff";ctx.lineWidth=3;ctx.setLineDash([8,4]);ctx.beginPath();if(cs==="circle")ctx.arc(cx2,cy2,r2,0,Math.PI*2);else ctx.rect(cx2-r2,cy2-r2,r2*2,r2*2);ctx.stroke();ctx.setLineDash([]);ctx.shadowBlur=0;ctx.fillStyle="#00ffff";ctx.beginPath();ctx.arc(cx2,cy2,6,0,Math.PI*2);ctx.fill();ctx.font="bold 14px monospace";ctx.fillText(`r=${cr}m`,cx2+10,cy2-10);}
@@ -344,7 +386,7 @@ drawC(topR.current,true);drawC(sideR.current,false);
 // TRANSECT — ayrı sabit canvas, topR'den bağımsız
 const tc=transR.current;if(tc&&tData&&tData.length>0&&tc.offsetWidth>0){
 const ctx=tc.getContext("2d"),W=tc.width=tc.offsetWidth*2,H=tc.height=tc.offsetHeight*2;ctx.fillStyle=dk;ctx.fillRect(0,0,W,H);
-const mD2=Math.max(...tData.map(p=>p.dist)),mZ=Math.max(...tData.map(p=>p.zN)),pL=50,pRt=20,pT=20,pBt=25;
+let mD2=0,mZ=0;for(const p of tData){if(p.dist>mD2)mD2=p.dist;if(p.zN>mZ)mZ=p.zN;}const pL=50,pRt=20,pT=20,pBt=25;
 const sx=(W-pL-pRt)/Math.max(mD2,1),sz=(H-pT-pBt)/Math.max(mZ,1);
 ctx.strokeStyle="#8B4513";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(pL,H-pBt);ctx.lineTo(W-pRt,H-pBt);ctx.stroke();
 for(let h=0;h<=mZ;h+=2){const y=H-pBt-h*sz;if(y<pT)continue;ctx.strokeStyle="#22d3ee15";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(pL,y);ctx.lineTo(W-pRt,y);ctx.stroke();ctx.fillStyle=txD;ctx.font="11px monospace";ctx.fillText(`${h}m`,5,y+4);}
@@ -357,8 +399,14 @@ if(mZ>1.3){const y=H-pBt-1.3*sz;ctx.strokeStyle="#f5920055";ctx.lineWidth=1;ctx.
 ctx.fillStyle=ac;ctx.font="bold 12px monospace";ctx.fillText(`Transect: ${mD2.toFixed(1)}m | Hmax: ${mZ.toFixed(1)}m | ${tData.length}pts`,pL,14);}
 },[aP,aB,aZ,cc,cr,cs,cMode,segs,ptSz,ptPct,clp,sel,pan,zoom,theme,dk,txD,tP1,tP2,tData]);
 useEffect(()=>{if(view==="2d")draw2D();},[draw2D,view]);
+// Transect canvas, açılma animasyonu (height 0→160) bittikten sonra 0-yükseklikli
+// canvas'a çizildiği için ilk anda boş kalıyordu. Konteyner gerçek yüksekliğe
+// ulaşana kadar rAF ile bekleyip yeniden çiziyoruz (sekme değiştirme gerekmez).
+useEffect(()=>{if(view!=="2d"||!hasTrans)return;let raf,tries=0;
+const tick=()=>{const tc=transR.current;if(tc&&tc.offsetHeight>0){draw2D();return;}if(tries++<30)raf=requestAnimationFrame(tick);};
+raf=requestAnimationFrame(tick);return()=>cancelAnimationFrame(raf);},[hasTrans,tData,view,draw2D]);
 
-/* ═══ 3D ═══ */
+// --- 3D ---
 useEffect(()=>{if(view!=="3d"||!aP||!aB)return;const el=threeR.current;if(!el)return;if(cleanR.current){cleanR.current();cleanR.current=null;}
 const W=el.offsetWidth,H=el.offsetHeight;if(!W||!H)return;const scene=new THREE.Scene();scene.background=new THREE.Color(theme==="dark"?0x080b10:0xf0f0f0);
 const cam=new THREE.PerspectiveCamera(55,W/H,.1,1e4);const ren=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});ren.setSize(W,H);el.appendChild(ren.domElement);
@@ -373,6 +421,7 @@ if(cMode==="rgb"&&aP.hasRGB){col[j*3]=aP.r[i]/255;col[j*3+1]=aP.g[i]/255;col[j*3
 else if(cMode==="segment"&&segs){const l=segs.labels[i];if(l<=0){col[j*3]=.06;col[j*3+1]=.07;col[j*3+2]=.09;}else{const h=CL[(l-1)%CL.length];col[j*3]=parseInt(h.slice(1,3),16)/255;col[j*3+1]=parseInt(h.slice(3,5),16)/255;col[j*3+2]=parseInt(h.slice(5,7),16)/255;}}
 else if(cMode==="normalized"&&aZ){const t=Math.min(1,aZ[i]/30);const[r,g,b2]=hC(t);col[j*3]=r;col[j*3+1]=g;col[j*3+2]=b2;}
 else if(cMode==="intensity"){const v=Math.min(1,aP.intensity[i]/255);col[j*3]=v;col[j*3+1]=v;col[j*3+2]=v;}
+else if(cMode==="classification"){const[r2,g2,b3]=clsCol(aP.classification[i]);col[j*3]=r2;col[j*3+1]=g2;col[j*3+2]=b3;}
 else{const t=aB.z1===aB.z0?.5:(aP.z[i]-aB.z0)/(aB.z1-aB.z0);const[r,g,b2]=hC(t);col[j*3]=r;col[j*3+1]=g;col[j*3+2]=b2;}j++;}
 const geom=new THREE.BufferGeometry();geom.setAttribute("position",new THREE.BufferAttribute(pos,3));geom.setAttribute("color",new THREE.BufferAttribute(col,3));
 const mat=new THREE.PointsMaterial({size:ptSz*.8,vertexColors:true,sizeAttenuation:true});scene.add(new THREE.Points(geom,mat));
@@ -383,10 +432,10 @@ const oD=e=>{drag=true;px_=e.clientX;py_=e.clientY;};const oM=e=>{if(!drag)retur
 const oU=()=>{drag=false;};const oW=e=>{dist*=e.deltaY>0?1.08:.92;dist=Math.max(range*.05,Math.min(range*6,dist));upC();e.preventDefault();};
 dE.addEventListener("mousedown",oD);dE.addEventListener("mousemove",oM);dE.addEventListener("mouseup",oU);dE.addEventListener("mouseleave",oU);dE.addEventListener("wheel",oW,{passive:false});
 let aId;const an=()=>{aId=requestAnimationFrame(an);ren.render(scene,cam);};an();
-cleanR.current=()=>{cam3D.current={theta,phi,dist};cancelAnimationFrame(aId);dE.removeEventListener("mousedown",oD);dE.removeEventListener("mousemove",oM);dE.removeEventListener("mouseup",oU);dE.removeEventListener("mouseleave",oU);dE.removeEventListener("wheel",oW);geom.dispose();mat.dispose();ren.dispose();if(el.contains(dE))el.removeChild(dE);};
+cleanR.current=()=>{cam3D.current={theta,phi,dist};cancelAnimationFrame(aId);dE.removeEventListener("mousedown",oD);dE.removeEventListener("mousemove",oM);dE.removeEventListener("mouseup",oU);dE.removeEventListener("mouseleave",oU);dE.removeEventListener("wheel",oW);geom.dispose();mat.dispose();ren.dispose();try{ren.forceContextLoss();}catch(_){}if(el.contains(dE))el.removeChild(dE);};
 return()=>{if(cleanR.current){cleanR.current();cleanR.current=null;}};},[view,aP,aB,aZ,cMode,segs,sel,ptSz,ptPct,theme]);
 
-/* ═══ MOUSE ═══ */
+// --- mouse ---
 const handleMouse=useCallback((e,act)=>{const c=topR.current;if(!c||!c._tr)return;const rect=c.getBoundingClientRect();
 const px=(e.clientX-rect.left)*2,py=(e.clientY-rect.top)*2;const{oX,oY,sc,xMn,yMn}=c._tr;const wx=(px-oX)/sc+xMn,wy=(oY-py)/sc+yMn;
 if(act==="down")dragR.current={on:true,moved:false,sx:e.clientX,sy:e.clientY,px:pan.x,py:pan.y};
@@ -398,7 +447,7 @@ else if(!clp&&zN)setCC({x:wx,y:wy});}}
 else if(act==="wheel"){e.preventDefault();setZoom(z=>Math.max(.1,Math.min(50,z*(e.deltaY>0?.9:1.1))));}
 },[clp,zN,tMode,tP1,pan]);
 
-/* ═══ RENDER ═══ */
+// --- render ---
 if(!data)return(
 <div style={{fontFamily:"'Geist Mono',monospace",background:dk,color:tx,height:"100vh",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:14}}>
 <div style={{fontSize:22,fontWeight:800,color:ac,letterSpacing:4}}>◆ FORA</div>
@@ -419,7 +468,24 @@ if(!data)return(
 <div><b>LAStools:</b> <code>las2las -i f.laz -o f.las</code></div>
 <div><b>PDAL:</b> <code>pdal translate f.laz f.las</code></div></div>}
 <div style={{color:txD,fontSize:9,marginTop:4}}>LAS 1.2–1.4</div>
-<div style={{display:"flex",gap:8,marginTop:8}}><button style={BT(L)} onClick={()=>setLang("TR")}>TR</button><button style={BT(!L)} onClick={()=>setLang("EN")}>EN</button></div></div>);
+<div style={{display:"flex",gap:8,marginTop:8}}><button style={BT(L)} onClick={()=>setLang("TR")}>TR</button><button style={BT(!L)} onClick={()=>setLang("EN")}>EN</button></div>
+{/* ATIF FOOTER */}
+<div style={{marginTop:18,paddingTop:12,borderTop:`1px solid ${bd}`,maxWidth:420,textAlign:"center"}}>
+<div style={{fontSize:9,color:txM,lineHeight:1.7}}>FORA v{FORA_VERSION} · MIT License · Burhan Gencal</div>
+<div style={{fontSize:9,color:txD,lineHeight:1.7}}>Bursa Technical University, Faculty of Forestry</div>
+<div style={{display:"flex",gap:12,justifyContent:"center",marginTop:6,fontSize:9}}>
+<a href={`https://doi.org/${FORA_DOI}`} target="_blank" rel="noopener noreferrer" style={{color:ac,textDecoration:"none"}}>DOI</a>
+<a href={FORA_REPO} target="_blank" rel="noopener noreferrer" style={{color:ac,textDecoration:"none"}}>GitHub</a>
+<button onClick={()=>setShowCite(s=>!s)} style={{background:"none",border:"none",color:ac,cursor:"pointer",fontSize:9,fontFamily:"inherit",padding:0,textDecoration:"underline"}}>{L?"Atıf":"Cite"}</button>
+</div>
+{showCite&&(<div style={{marginTop:8,padding:8,background:pn2,border:`1px solid ${bd}`,borderRadius:6,textAlign:"left"}}>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+<span style={{fontSize:9,fontWeight:700,color:txM}}>BibTeX</span>
+<button onClick={()=>{navigator.clipboard?.writeText(FORA_BIBTEX).then(()=>{setCiteCopied(true);setTimeout(()=>setCiteCopied(false),1500);});}} style={{...BT(citeCopied),fontSize:9,padding:"2px 8px"}}>{citeCopied?(L?"✓ Kopyalandı":"✓ Copied"):(L?"Kopyala":"Copy")}</button></div>
+<pre style={{fontSize:8,color:tx,margin:0,whiteSpace:"pre-wrap",wordBreak:"break-word",fontFamily:"inherit",lineHeight:1.4}}>{FORA_BIBTEX}</pre>
+<div style={{fontSize:8,color:txD,marginTop:6,lineHeight:1.5}}>{L?"Yazılımı kullanırsanız lütfen yukarıdaki Zenodo kaydına atıf verin. Eşlik eden makale yayımlandığında bu bilgi güncellenecektir.":"If you use this software, please cite the Zenodo record above. This will be updated when the accompanying paper is published."}</div>
+</div>)}
+</div></div>);
 
 return(
 <div style={{fontFamily:"'Geist Mono',monospace",background:dk,color:tx,height:"100vh",display:"flex",flexDirection:"column",overflow:"hidden"}}>
@@ -427,13 +493,13 @@ return(
 <div style={{padding:"4px 10px",background:pn2,borderBottom:`1px solid ${bd}`,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",fontSize:10}}>
 <span style={{color:ac,fontWeight:800,fontSize:11,letterSpacing:3}}>◆ FORA</span>
 <span style={{fontSize:9,color:txD,background:ac+"11",padding:"1px 5px",borderRadius:3}}>{(aP.x.length/1e3).toFixed(0)}K</span>
-{segs&&<span style={{fontSize:9,color:gn2,background:gn2+"11",padding:"1px 5px",borderRadius:3}}>{segs.count} {L?"ağaç":"trees"}</span>}
+{segs&&<span title={L?"Ölçülen ağaç (≥5 nokta) / bulunan segment":"Measured trees (≥5 points) / detected segments"} style={{fontSize:9,color:gn2,background:gn2+"11",padding:"1px 5px",borderRadius:3}}>{met?`${met.length} / ${segs.count}`:segs.count} {L?"ağaç":"trees"}</span>}
 {msg&&<span style={{color:og}}>{msg}</span>}<div style={{flex:1}}/>
 <div style={{display:"flex",border:`1px solid ${bd}`,borderRadius:4,overflow:"hidden"}}><button style={{...BT(view==="2d"),borderRadius:0,border:"none",padding:"3px 12px"}} onClick={()=>setView("2d")}>2D</button><button style={{...BT(view==="3d"),borderRadius:0,border:"none",padding:"3px 12px",borderLeft:`1px solid ${bd}`}} onClick={()=>setView("3d")}>3D</button></div>
-<select style={IN} value={cMode} onChange={e=>setCMode(e.target.value)}><option value="height">{L?"Yükseklik":"Height"}</option><option value="normalized">Normalize</option>{aP.hasRGB&&<option value="rgb">RGB</option>}<option value="intensity">{L?"Yoğunluk":"Intensity"}</option>{segs&&<option value="segment">Segment</option>}</select>
-<button style={BT(theme==="light")} onClick={()=>setTheme(t=>t==="dark"?"light":"dark")}>{theme==="dark"?"☀":"🌙"}</button>
+<select style={IN} value={cMode} onChange={e=>setCMode(e.target.value)}><option value="height">{L?"Yükseklik":"Height"}</option><option value="normalized">Normalize</option>{aP.hasRGB&&<option value="rgb">RGB</option>}<option value="intensity">{L?"Yoğunluk":"Intensity"}</option><option value="classification">{L?"Sınıf":"Classification"}</option>{segs&&<option value="segment">Segment</option>}</select>
+<button aria-label={L?"Tema değiştir":"Toggle theme"} title={L?"Tema değiştir":"Toggle theme"} style={BT(theme==="light")} onClick={()=>setTheme(t=>t==="dark"?"light":"dark")}>{theme==="dark"?"☀":"🌙"}</button>
 <div style={{display:"flex",border:`1px solid ${bd}`,borderRadius:4,overflow:"hidden"}}><button style={{...BT(L),borderRadius:0,border:"none",padding:"3px 8px"}} onClick={()=>setLang("TR")}>TR</button><button style={{...BT(!L),borderRadius:0,border:"none",padding:"3px 8px",borderLeft:`1px solid ${bd}`}} onClick={()=>setLang("EN")}>EN</button></div>
-{clp&&<button style={BT(false)} onClick={hReset}>↩</button>}
+{clp&&<button aria-label={L?"Kırpmayı sıfırla":"Reset clip"} title={L?"Kırpmayı sıfırla":"Reset clip"} style={BT(false)} onClick={hReset}>↩</button>}
 <label style={{...BT(false),cursor:"pointer"}}>{L?"Yeni":"New"}<input type="file" accept=".las,.laz" onChange={handleFile} style={{display:"none"}}/></label></div>
 
 <div style={{flex:1,display:"flex",overflow:"hidden"}}>
@@ -496,7 +562,20 @@ return(
 <div style={{fontSize:9,color:txM,marginBottom:4,fontWeight:600}}>{L?"Pencere Modu":"Window Mode"}</div>
 <label style={{fontSize:10,color:tx,display:"flex",alignItems:"center",gap:4,marginBottom:3,cursor:"pointer"}}><input type="radio" name="wsMode" checked={!vwsMode} onChange={()=>setVwsMode(false)} style={{margin:0}}/>{L?"Sabit (varsayılan)":"Fixed (default)"}</label>
 <label style={{fontSize:10,color:tx,display:"flex",alignItems:"center",gap:4,marginBottom:3,cursor:"pointer"}}><input type="radio" name="wsMode" checked={vwsMode} onChange={()=>setVwsMode(true)} style={{margin:0}}/>VWS (Popescu & Wynne 2004)</label>
-{vwsMode&&(<select value={vwsPreset} onChange={e=>setVwsPreset(e.target.value)} style={{...IN,width:"100%",marginTop:3}}><option value="pine">Pine / coniferous</option><option value="deciduous">Deciduous / broadleaved</option><option value="combined">Combined (mixed forest)</option><option value="linear_boreal">Linear (boreal-tuned, empirical)</option></select>)}
+{vwsMode&&(<select value={vwsPreset} onChange={e=>setVwsPreset(e.target.value)} style={{...IN,width:"100%",marginTop:3}}><option value="pine">Pine / coniferous</option><option value="deciduous">Deciduous / broadleaved</option><option value="combined">Combined (mixed forest)</option><option value="linear_boreal">Linear (boreal-tuned, empirical)</option><option value="custom">{L?"Özel (site-specific)":"Custom (site-specific)"}</option></select>)}
+{vwsMode&&vwsPreset==="custom"&&(<div style={{marginTop:5,padding:6,background:ac+"0d",border:`1px solid ${bd}`,borderRadius:4}}>
+<div style={{display:"flex",gap:6,marginBottom:4}}>
+<label style={{fontSize:9,color:tx,display:"flex",alignItems:"center",gap:3,cursor:"pointer"}}><input type="radio" name="cvMode" checked={vwsCustom.mode==="linear"} onChange={()=>setVwsCustom({...vwsCustom,mode:"linear"})} style={{margin:0}}/>{L?"Doğrusal":"Linear"}</label>
+<label style={{fontSize:9,color:tx,display:"flex",alignItems:"center",gap:3,cursor:"pointer"}}><input type="radio" name="cvMode" checked={vwsCustom.mode==="quad"} onChange={()=>setVwsCustom({...vwsCustom,mode:"quad"})} style={{margin:0}}/>{L?"Karesel":"Quadratic"}</label>
+</div>
+<div style={{fontSize:8,color:txM,marginBottom:4,fontStyle:"italic",lineHeight:1.3}}>{vwsCustom.mode==="linear"?"CW = clamp(a + b·H, min, max)":"CW = a + b·H + c·H²"}</div>
+<div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+<div style={{flex:"1 1 40%"}}><span style={{fontSize:8,color:txM}}>a</span><input type="number" step="0.001" value={vwsCustom.a} onChange={e=>setVwsCustom({...vwsCustom,a:e.target.value})} style={{...IN,width:"100%",padding:"2px 4px",fontSize:10}}/></div>
+<div style={{flex:"1 1 40%"}}><span style={{fontSize:8,color:txM}}>b</span><input type="number" step="0.001" value={vwsCustom.b} onChange={e=>setVwsCustom({...vwsCustom,b:e.target.value})} style={{...IN,width:"100%",padding:"2px 4px",fontSize:10}}/></div>
+{vwsCustom.mode==="quad"&&(<div style={{flex:"1 1 40%"}}><span style={{fontSize:8,color:txM}}>c</span><input type="number" step="0.0001" value={vwsCustom.c} onChange={e=>setVwsCustom({...vwsCustom,c:e.target.value})} style={{...IN,width:"100%",padding:"2px 4px",fontSize:10}}/></div>)}
+{vwsCustom.mode==="linear"&&(<><div style={{flex:"1 1 40%"}}><span style={{fontSize:8,color:txM}}>min (m)</span><input type="number" step="0.5" value={vwsCustom.min} onChange={e=>setVwsCustom({...vwsCustom,min:e.target.value})} style={{...IN,width:"100%",padding:"2px 4px",fontSize:10}}/></div>
+<div style={{flex:"1 1 40%"}}><span style={{fontSize:8,color:txM}}>max (m)</span><input type="number" step="0.5" value={vwsCustom.max} onChange={e=>setVwsCustom({...vwsCustom,max:e.target.value})} style={{...IN,width:"100%",padding:"2px 4px",fontSize:10}}/></div></>)}
+</div></div>)}
 </div>
 <div style={{marginTop:6,paddingTop:6,borderTop:`1px solid ${bd}`}}>
 <div style={{fontSize:9,color:txM,marginBottom:4,fontWeight:600}}>{L?"Taç Projeksiyon":"Crown Projection"}</div>
@@ -504,7 +583,7 @@ return(
 <div style={{fontSize:8,color:txM,marginTop:4,lineHeight:1.4,fontStyle:"italic"}}>{L?"ℹ Tüm CD/CPA değerleri (bbox + convex) CSV'de listelenir":"ℹ All CD/CPA values (bbox + convex) listed in CSV"}</div>
 </div>
 <button style={{...BT(true),width:"100%",marginTop:8}} onClick={hSeg}>▶ {L?"Çalıştır":"Run"}</button>
-{segs&&<div style={{color:gn2,fontSize:10,marginTop:4}}>{segs.count} {L?"ağaç":"trees"}</div>}
+{segs&&<div style={{color:gn2,fontSize:10,marginTop:4}}>{met?`${met.length} ${L?"ağaç ölçüldü":"trees measured"} (${segs.count} ${L?"segment":"segments"})`:`${segs.count} ${L?"segment":"segments"}`}</div>}
 </Sc>)}
 
 {tab==="metrics"&&(<Sc t={L?"Ağaç Metrikleri":"Tree Metrics"}>{!met?<div style={{fontSize:10,color:txD}}>{L?"Segmentasyon yapın":"Run seg"}</div>:(
@@ -525,9 +604,9 @@ return(
 {!areaMet&&!areaErr&&<div style={{fontSize:10,color:txD}}>{L?"Hesapla butonuna tıklayın":"Click Calculate"}</div>}
 {areaMet&&(<div style={{fontSize:9,color:txM,lineHeight:2}}>
 <div style={{fontSize:10,fontWeight:600,color:ac,marginBottom:4}}>{L?"Persentiller":"Percentiles"}</div>
-{[["H5",areaMet.h5],["H25",areaMet.h25],["H50",areaMet.h50],["H75",areaMet.h75],["H95",areaMet.h95],["H99",areaMet.h99]].map(([k,v])=><div key={k} style={{display:"flex",justifyContent:"space-between"}}><span>{k}</span><span style={{color:tx}}>{v.toFixed(2)} m</span></div>)}
+{[["H5",areaMet.h5],["H10",areaMet.h10],["H25",areaMet.h25],["H50",areaMet.h50],["H75",areaMet.h75],["H90",areaMet.h90],["H95",areaMet.h95],["H99",areaMet.h99]].map(([k,v])=><div key={k} style={{display:"flex",justifyContent:"space-between"}}><span>{k}</span><span style={{color:tx}}>{v.toFixed(2)} m</span></div>)}
 <div style={{fontSize:10,fontWeight:600,color:ac,marginTop:8,marginBottom:4}}>{L?"İstatistik":"Statistics"}</div>
-{[["Mean",areaMet.h_mean,"m"],["Max",areaMet.h_max,"m"],["SD",areaMet.h_sd,"m"],["CV",areaMet.cv_h,"%"],["Kurt",areaMet.kurtosis,""],["IQR",areaMet.iqr,"m"]].map(([k,v,u])=><div key={k} style={{display:"flex",justifyContent:"space-between"}}><span>{k}</span><span style={{color:tx}}>{v.toFixed(2)} {u}</span></div>)}
+{[["Mean",areaMet.h_mean,"m"],["Max",areaMet.h_max,"m"],["SD",areaMet.h_sd,"m"],["CV",areaMet.cv_h,"%"],["Skew",areaMet.skewness,""],["Kurt",areaMet.kurtosis,""],["IQR",areaMet.iqr,"m"]].map(([k,v,u])=><div key={k} style={{display:"flex",justifyContent:"space-between"}}><span>{k}</span><span style={{color:tx}}>{v.toFixed(2)} {u}</span></div>)}
 <div style={{fontSize:10,fontWeight:600,color:ac,marginTop:8,marginBottom:4}}>{L?"Yoğunluk":"Density"}</div>
 {[["D1",areaMet.d1],["D3",areaMet.d3],["D5",areaMet.d5],["D7",areaMet.d7],["D9",areaMet.d9],["CC₁.₃",areaMet.cc13]].map(([k,v])=><div key={k} style={{display:"flex",justifyContent:"space-between"}}><span>{k}</span><span style={{color:tx}}>{(v*100).toFixed(1)}%</span></div>)}
 <div style={{fontSize:10,fontWeight:600,color:ac,marginTop:8,marginBottom:4}}>ITC</div>
@@ -554,7 +633,7 @@ return(<><div style={{fontSize:9,color:txD,marginBottom:8}}>{L?"Manuel değer gi
 {tP1&&!tP2&&<div style={{fontSize:9,color:og}}>P1 ✓</div>}
 {tData&&<div style={{fontSize:9,color:gn2}}>{tData.length} pts</div>}
 <button style={{...BT(false),width:"100%",marginTop:4}} onClick={()=>{setTP1(null);setTP2(null);setTData(null);}}>🗑 {L?"Temizle":"Clear"}</button>
-<div style={{fontSize:8,color:og,marginTop:8,padding:6,background:og+"15",border:`1px solid ${og}44`,borderRadius:4,lineHeight:1.4}}>{L?"ℹ Not: Çizimden sonra transekt görünmüyorsa 3D → 2D sekmelerine geçin (v1.7.2'de düzeltilecek).":"ℹ Tip: After drawing, if the transect doesn't appear, toggle 3D → 2D tabs to refresh (fix planned for v1.7.2)."}</div></Sc>)}
+<div style={{fontSize:8,color:txM,marginTop:8,padding:6,background:ac+"11",border:`1px solid ${ac}33`,borderRadius:4,lineHeight:1.4}}>{L?"ℹ 2D görünümde çizgi boyunca 2 nokta seçin; dikey kanopi profili altta çizilir (1.3 m referans dahil).":"ℹ In 2D view, pick 2 points along a line; the vertical canopy profile is drawn below (incl. 1.3 m reference)."}</div></Sc>)}
 </div></div></div></div>);}
 function Sc({t,children}){return(<div><div style={{fontSize:10,fontWeight:700,color:"#22d3ee",marginBottom:5,letterSpacing:.3,textTransform:"uppercase"}}>{t}</div>{children}</div>);}
 function Rw({l,children}){return(<div style={{display:"flex",alignItems:"center",gap:5,marginBottom:4}}><span style={{fontSize:9,color:"#7b8594",minWidth:60}}>{l}</span>{children}</div>);}

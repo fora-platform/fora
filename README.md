@@ -3,36 +3,36 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)](https://reactjs.org/)
 [![Three.js](https://img.shields.io/badge/Three.js-r128-000000?logo=three.js)](https://threejs.org/)
+[![Version](https://img.shields.io/badge/version-1.8.0-brightgreen.svg)](https://github.com/fora-platform/fora/releases)
 
-**FORA** is an open-source, browser-based web platform for processing forest LiDAR point clouds at individual tree and stand levels. All computation runs entirely on the client side — no installation, no server, no programming knowledge required.
+**FORA** is an open-source, browser-based platform for processing forest LiDAR point clouds at the individual-tree and stand levels. All computation runs entirely on the client side — no installation, no server, no programming knowledge required, and point cloud data never leaves the user's device.
 
-🌲 **Live demo:** [fora-platform.github.io/fora](https://fora-platform.github.io/fora)
-
----
+**Live demo:** [fora-platform.github.io/fora](https://fora-platform.github.io/fora)
 
 ## Features
 
-- 📂 **LAS file parsing** (versions 1.2–1.4, point data record formats 0–10)
-- 🎨 **Interactive 3D/2D visualization** with WebGL (Three.js)
-- 📏 **Height normalization** using grid-based minimum-Z + gap filling
-- ✂️ **Spatial clipping** (circular or rectangular regions of interest)
-- 🌳 **CHM-based individual tree detection (ITD)** with marker-controlled watershed
-- 📊 **Area-based approach (ABA) metrics**: height percentiles (H5–H99), density ratios (D1–D9), canopy cover (CC₁.₃), variability statistics
-- 🔢 **Allometric DBH estimation** for 8 Turkish tree species with published coefficients
-- 🌿 **Aboveground biomass estimation** for *Pinus brutia* (5 components: stem, branches, bark, needles, total)
-- 📐 **Transect profile analysis**
-- 📈 **Paired statistical comparison** (RMSE, Bias, R², paired t-test)
-- 💾 **Multi-format export** (CSV, PNG)
-- 🌍 **Bilingual UI** (Turkish/English)
+- **LAS file parsing** — versions 1.2–1.4, point data record formats 0–10, with correct classification handling for the LAS 1.4 formats 6–10 (see *Notes on LAS parsing* below)
+- **Interactive 3D/2D visualization** with WebGL (Three.js), with point colouring by height, normalized height, RGB, intensity, classification, or tree segment
+- **Height normalization** — grid-based minimum-Z with gap filling, or an external DTM (GeoTIFF, ESRI ASCII grid, or XYZ ground points)
+- **Spatial clipping** — circular or rectangular regions of interest
+- **CHM-based individual tree detection** — local-maxima seeds with a fixed or variable window size (VWS), followed by height-ranked region growing
+- **Variable window size** — four presets (Pine, Deciduous, Combined, Linear-boreal) plus a custom-coefficient entry (linear or quadratic) for site-specific calibration
+- **Crown projection** — bounding box, convex hull, or concave hull (KNN-based)
+- **Area-based metrics** — height percentiles (H5–H99), density ratios (D1–D9), canopy cover (CC₁.₃), and variability statistics
+- **Allometric DBH estimation** for 8 Turkish tree species
+- **Aboveground biomass** for *Pinus brutia* (five components)
+- **Vertical transect profile** analysis
+- **Multi-format export** (CSV, PNG)
+- **Bilingual UI** (English/Turkish), fully offline after first load
 
----
-
-## Quick Start
+## Quick start
 
 ### Use online (no install)
-Just open [fora-platform.github.io/fora](https://fora-platform.github.io/fora) in Chrome, Firefox, Edge, or Safari.
+Open [fora-platform.github.io/fora](https://fora-platform.github.io/fora) in Chrome, Firefox, Edge, or Safari.
 
 ### Run locally
+Prerequisite: Node.js 18+ (20 LTS recommended)
+
 ```bash
 git clone https://github.com/fora-platform/fora.git
 cd fora
@@ -46,127 +46,54 @@ npm run build
 npm run preview
 ```
 
----
+## Notes on LAS parsing
 
-## Workflow
+- The classification field is read from byte 15 for the legacy point formats 0–5 and from byte 16 for the LAS 1.4 formats 6–10, where the field is relocated.
+- To preserve precision for projected coordinates with large values (e.g. UTM northings), absolute coordinates are reduced by a double-precision local origin before being stored as single-precision floats. The origin is retained internally so that absolute coordinates are reconstructed for CSV export and external-DTM matching.
+- Small LAS files covering formats 0–3 and 6–8 are provided in [`test_data/`](test_data/) together with the generator script [`test_data/make_test_las.R`](test_data/make_test_las.R). Each file contains a flat ground surface (class 2) and three tree clusters (class 5). Load a file and set the point colouring to *Classification*: the ground should render brown and the tree clusters green in every format. Reading the classification byte from the wrong offset makes the two groups collapse into a single colour, so this is a direct check of the LAS 1.4 handling. The colour-carrying formats (2, 3, 7, 8) store the same brown/green pattern as RGB, which likewise checks the per-format colour offset (byte 20, 28 and 30 respectively).
 
-1. **Load** a `.las` file (up to ~5 million points in browser)
-2. **Normalize** — heights are computed automatically
-3. **Clip** (optional) — select a circular or rectangular region of interest
-4. **Segment** — run CHM-based tree segmentation (cell 0.5 m, minH 2 m, search radius 3 m by default)
-5. **Metrics** — tree-level metrics appear in a sortable table
-6. **Area** — compute ABA metrics (parameter-invariant, independent of segmentation choices)
-7. **Species** — select a species and apply allometric model to estimate DBH (and biomass for *P. brutia*)
-8. **Export** — download CSV for trees and area metrics, or PNG for maps
+## Reproducing the validation
 
----
+The full validation can be reproduced with [`validation/fora_validation.R`](validation/fora_validation.R). It covers:
 
-## Allometric Models
+1. **Cross-tool agreement** over eight UAV-LiDAR datasets. FORA's exported per-tree metrics are compared against three lidR algorithms (`dalponte2016`, `silva2016`, `watershed`).
+2. **Window-size settings** on the tallest dataset (EN23611_2): lidR is run under a fixed window and four crown-width functions, each compared with FORA's own tree set for that dataset.
 
-FORA includes 8 published allometric models for Turkish forest species:
+In both parts the comparison set is FORA's own output, so the reported statistics describe cross-tool agreement, not accuracy against ground truth.
 
-| Species | Model | Source |
-|---------|-------|--------|
-| *Pinus sylvestris* (Sarıçam) | DBH = −5.22 + 1.65·H + 2.35·CD | Gencal (2025) PhD thesis + Karahalil & Karsli (2017) |
-| *Abies bornmuelleriana* (Uludağ göknarı) | DBH = −6.27 + 1.80·H + 2.06·CD | Gencal (2025) + Karahalil & Karsli (2017) |
-| *Pinus brutia* ME — coastal (Kızılçam) | Gompertz, a=22.527, b=1.823, c=0.062 | Özçelik et al. (2014) |
-| *Pinus brutia* IE — inland | Gompertz, a=25.911, b=2.004, c=0.045 | Özçelik et al. (2014) |
-| *Pinus brutia* LE — lake | Gompertz, a=24.207, b=1.465, c=0.038 | Özçelik et al. (2014) |
-| *Pinus nigra* (Karaçam) | Gompertz, a=23.494, b=2.397, c=0.067 | Özçelik et al. (2014) |
-| *Fagus orientalis* (Doğu kayını) | Schnute, a=1.659, b=0.051 | Ercanli (2015) Kestel-Bursa |
-| *Pinus pinea* (Fıstık çamı) | Power approx. | Carus & Akguş (2018) — PDF verification pending |
-| *Quercus cerris* (Saçlı meşe) | Chapman-Richards (proxy) | Cimini & Salvati (2011) — Turkish source pending |
+### Matching rule
 
-**Biomass module** for *Pinus brutia* (Mediterranean Turkey):
-- Sönmez, Kahriman, Şahin, Yavuz (2016), *Šumarski List* 140(11-12)
-- DOI: [10.31298/SL.140.11-12.4](https://doi.org/10.31298/SL.140.11-12.4)
+For each FORA tree, the nearest lidR tree within 5 m that has not already been used is selected, so each lidR tree is matched at most once (greedy, one-to-one). Segments with fewer than five points are dropped on both sides. Positions are the crown bounding-box centre on the FORA side and the segment centroid on the lidR side; both approximate the stem position, and the mean matching distance is about 1 m.
 
-See `ALLOMETRIC_MODELS.md` for full equations and coefficients.
+### Exporting from FORA
 
----
+Run each dataset with the default parameters (CHM cell 0.5 m, minimum height 2 m, search radius 3 m) and leave crown projection on **bounding box**, which is what the script's crown-diameter formula assumes. Export the tree metrics CSV and name it `FORA_<dataset>_metrics.csv`. The script accepts both the current column names (`H_auto`, `CD_auto`) and the older ones (`H_m`, `CD_m`).
 
-## Validation
+### Inputs and clipping
 
-FORA has been validated on:
-- **8 UAV LiDAR datasets** (4,878 matched trees) against lidR algorithms (Dalponte2016, Silva2016, Watershed) — pooled R² = 0.901, RMSE = 2.27 m
-- **7 full-extent PANGAEA datasets** (Yakutia, Russia) — ITC mean height R² = 0.948 against published reference segmentation
+Set the three paths at the top of the script:
 
-All validation datasets are from PANGAEA (Kruse et al. 2025):
-- Yakutia 2021: [10.1594/PANGAEA.980735](https://doi.org/10.1594/PANGAEA.980735)
-- NW Canada 2022: [10.1594/PANGAEA.977771](https://doi.org/10.1594/PANGAEA.977771)
-- E Alaska 2023: [10.1594/PANGAEA.980485](https://doi.org/10.1594/PANGAEA.980485)
-- W Alaska 2024: [10.1594/PANGAEA.980757](https://doi.org/10.1594/PANGAEA.980757)
+- `las_dir` — `<id>_treesonly.laz` and `<id>_ground_classification.laz` per dataset
+- `fora_dir` — the FORA metric exports
+- `out_dir` — where tables and figures are written
 
----
+Six of the datasets are clipped to a square around a given centre. The point cloud is clipped to twice the side of the reference square so that crowns at the edge of the reference area remain complete; the comparison itself only involves trees present in the FORA export.
+
+### Validation data
+
+The eight datasets are openly available from PANGAEA and were located with a search restricted to the DJI Matrice 300 RTK / YellowScan Mapper acquisition method:
+
+- Yakutia, Russia 2021 — https://doi.org/10.1594/PANGAEA.980735
+- Northwestern Canada 2022 — https://doi.org/10.1594/PANGAEA.977771
+- Eastern Alaska 2023 — https://doi.org/10.1594/PANGAEA.980485
+- Western and central Alaska 2024 — https://doi.org/10.1594/PANGAEA.980757
+
+Each archive provides ground-classified point clouds and per-site vegetation returns; the files used here are the `_treesonly` and `_ground_classification` products for the eight sites listed in the article.
 
 ## Citation
 
-If you use FORA in your research, please cite:
-
-```bibtex
-@software{gencal2026fora,
-  author  = {Gencal, Burhan},
-  title   = {FORA: A browser-based platform for processing UAV-LiDAR point clouds in forest structures},
-  version = {1.0.0},
-  year    = {2026},
-  url     = {https://github.com/fora-platform/fora},
-       = {https://doi.org/10.5281/zenodo.19634971}
-}
-```
-
-And the accompanying publication (under review):
-> Gencal B. (2026) FORA: A browser-based platform for processing UAV-LiDAR point clouds in forest structures. *SoftwareX* (under review).
-
----
-
-## Limitations
-
-- Browser memory constrains processing to approximately 5 million points per session
-- LAZ compressed files are not yet supported — use CloudCompare, lidR, LAStools, or PDAL to convert LAZ to LAS
-- Ground estimation uses simplified grid-minimum approach (not TIN or CSF)
-- Allometric coefficients for *Pinus pinea* and *Quercus cerris* are approximate pending PDF verification and Turkish-source alternatives
-- CHM-based segmentation inherently underperforms point cloud-based methods in multi-layered forests
-
----
-
-## Roadmap
-
-- [ ] LAZ format support via WebAssembly (laz-perf)
-- [ ] User-defined allometric equations
-- [ ] Canopy gap analysis
-- [ ] TIN-based DTM with cloth simulation filter (CSF)
-- [ ] Batch processing with Web Workers
-- [ ] Session state persistence (IndexedDB)
-- [ ] Additional species (*Cedrus libani*, *Picea orientalis*)
-
----
+If you use FORA, please cite the archived release (see [`CITATION.cff`](CITATION.cff)) and the SoftwareX article once published. The concept DOI [10.5281/zenodo.20788089](https://doi.org/10.5281/zenodo.20788089) always resolves to the latest version; each release also has its own version DOI.
 
 ## License
 
-FORA is released under the **MIT License** — see [LICENSE](LICENSE) for details.
-
----
-
-## Author
-
-**Burhan Gencal**  
-Bursa Technical University, Faculty of Forestry  
-Department of Forest Engineering  
-16310 Bursa, Türkiye  
-📧 burhan.gencal@btu.edu.tr
-
----
-
-## Acknowledgments
-
-- Alfred Wegener Institute (AWI) and North-Eastern Federal University of Yakutsk (NEFU) for providing open UAV LiDAR datasets via PANGAEA (Kruse et al. 2025)
-- The PANGAEA repository for free access to the validation datasets
-- All authors whose published allometric equations are implemented in this software (see `ALLOMETRIC_MODELS.md` for full citations)
-
----
-
-## Contributing
-
-Issues and pull requests are welcome at [github.com/fora-platform/fora/issues](https://github.com/fora-platform/fora/issues).
-
-For major changes, please open an issue first to discuss what you would like to change.
+MIT — see [`LICENSE`](LICENSE).

@@ -1,24 +1,24 @@
 cff-version: 1.2.0
-message: "If you use this software, please cite it as below."
-title: "FORA: A browser-based platform for processing UAV-LiDAR point clouds in forest structures"
-version: 1.0.0
-date-released: 2026-04-17
+message: "If you use FORA, please cite it as below."
+title: "FORA: An Open-Source Browser-Based Platform for Processing UAV-LiDAR Point Clouds in Forest Structures"
+version: 1.8.0
+date-released: 2026-07-18
 license: MIT
-type: software
 repository-code: "https://github.com/fora-platform/fora"
 url: "https://fora-platform.github.io/fora"
 authors:
   - family-names: Gencal
     given-names: Burhan
+    affiliation: "Department of Forest Engineering, Faculty of Forestry, Bursa Technical University, Bursa, Türkiye"
     email: burhan.gencal@btu.edu.tr
-    affiliation: "Bursa Technical University, Faculty of Forestry, Department of Forest Engineering, Bursa, Turkey"
 keywords:
-  - "UAV LiDAR"
-  - "point cloud"
-  - "individual tree detection"
-  - "area-based approach"
-  - "browser-based"
-  - "canopy height model"
-  - "forest inventory"
-  - "allometric models"
-  - "biomass estimation"
+  - UAV LiDAR
+  - forest inventory
+  - individual tree detection
+  - area-based approach
+  - browser-based
+  - canopy height model
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.20788089
+    description: "Concept DOI (all versions)"
