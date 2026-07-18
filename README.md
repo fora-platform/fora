@@ -92,7 +92,7 @@ Each archive provides ground-classified point clouds and per-site vegetation ret
 
 ## Citation
 
-If you use FORA, please cite the archived release (see [`CITATION.cff`](CITATION.cff)) and the SoftwareX article once published. The concept DOI [10.5281/zenodo.20788089](https://doi.org/10.5281/zenodo.20788089) always resolves to the latest version; each release also has its own version DOI.
+If you use FORA, please cite the archived release (see [`CITATION.cff`](CITATION.cff)) and the SoftwareX article once published. The concept DOI [10.5281/zenodo.19546162](https://doi.org/10.5281/zenodo.19546162) always resolves to the latest version; each release also has its own version DOI.
 
 ## License
 

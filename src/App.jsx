@@ -279,7 +279,7 @@ function dlF(blob,name){const url=URL.createObjectURL(blob);const a=document.cre
 
 // --- citation ---
 const FORA_VERSION="1.8.0";
-const FORA_DOI="10.5281/zenodo.20788089";
+const FORA_DOI="10.5281/zenodo.19546162";
 const FORA_REPO="https://github.com/fora-platform/fora";
 const FORA_BIBTEX=`@software{gencal_fora_2026,
   author    = {Gencal, Burhan},
