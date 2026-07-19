@@ -1,13 +1,14 @@
 {
   "name": "fora",
   "version": "1.8.0",
-  "description": "FORA — Browser-based platform for UAV-LiDAR forest point cloud analysis",
+  "description": "FORA — An Open-Source browser-based platform for UAV-LiDAR forest point cloud analysis",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "gh-pages -d dist"
+    "deploy": "gh-pages -d dist",
+    "test": "node --test \"test/*.test.mjs\""
   },
   "author": "Burhan Gencal <burhan.gencal@btu.edu.tr>",
   "license": "MIT",

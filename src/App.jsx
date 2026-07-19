@@ -1,22 +1,8 @@
 import{useState,useRef,useEffect,useCallback}from"react";
 import*as THREE from"three";
 
-// --- LAS parser ---
-function parseLAS(buf){const dv=new DataView(buf);if(String.fromCharCode(dv.getUint8(0),dv.getUint8(1),dv.getUint8(2),dv.getUint8(3))!=="LASF")throw new Error("Invalid LAS");
-const vM=dv.getUint8(24),vN=dv.getUint8(25),off=dv.getUint32(96,true),fmt=dv.getUint8(104),rec=dv.getUint16(105,true);let n=dv.getUint32(107,true);if(vM===1&&vN>=4&&n===0)n=Number(dv.getBigUint64(247,true));
-const xS=dv.getFloat64(131,true),yS=dv.getFloat64(139,true),zS=dv.getFloat64(147,true),xO=dv.getFloat64(155,true),yO=dv.getFloat64(163,true),zO=dv.getFloat64(171,true);
-const hasRGB=[2,3,5,7,8,10].includes(fmt);let ro=20;if(fmt===3||fmt===5)ro=28;if(fmt>=7)ro=30;
-// LAS 1.4 point formats 6-10: classification moved to byte 16 (byte 15 = classification flags)
-const clOff=fmt>=6?16:15;
-if(rec<20||!isFinite(rec))throw new Error("Invalid LAS: point record length="+rec);
-const M=5e6,step=n>M?Math.ceil(n/M):1,cap=Math.ceil(n/step);
-const x=new Float32Array(cap),y=new Float32Array(cap),z=new Float32Array(cap),r=new Uint8Array(cap),g=new Uint8Array(cap),b=new Uint8Array(cap),it=new Uint16Array(cap),cl=new Uint8Array(cap);let idx=0;
-// store x/y relative to a double-precision origin so large projected coords
-// keep precision in Float32; origin kept for CSV export and DTM matching
-let ox=null,oy=null;
-for(let i=0;i<n&&idx<cap;i+=step){const o=off+i*rec;if(o+20>buf.byteLength)break;const ax=dv.getInt32(o,true)*xS+xO,ay=dv.getInt32(o+4,true)*yS+yO;if(ox===null){ox=ax;oy=ay;}x[idx]=ax-ox;y[idx]=ay-oy;z[idx]=dv.getInt32(o+8,true)*zS+zO;
-it[idx]=dv.getUint16(o+12,true);cl[idx]=dv.getUint8(o+clOff);if(hasRGB&&o+ro+6<=buf.byteLength){r[idx]=dv.getUint16(o+ro,true)>>8;g[idx]=dv.getUint16(o+ro+2,true)>>8;b[idx]=dv.getUint16(o+ro+4,true)>>8;}idx++;}
-return{nOrig:n,n:idx,ver:`${vM}.${vN}`,format:"LAS",hasRGB,ox:ox||0,oy:oy||0,x:x.subarray(0,idx),y:y.subarray(0,idx),z:z.subarray(0,idx),r:r.subarray(0,idx),g:g.subarray(0,idx),b:b.subarray(0,idx),intensity:it.subarray(0,idx),classification:cl.subarray(0,idx)};}
+import{parseLAS}from"./lasParser.js";
+
 
 // ASPRS classification colours (ground, low/med/high vegetation, building, water)
 const CLS_COL={0:[0.6,0.6,0.6],1:[0.7,0.7,0.7],2:[0.65,0.45,0.25],3:[0.55,0.75,0.35],
@@ -208,8 +194,8 @@ else{const a=v00*(1-dx)+v10*dx,b=v01*(1-dx)+v11*dx,g=a*(1-dy)+b*dy;out[i]=pts.z[
 // Inverse-solving used for pure h-d models (Gompertz, Schnute, Prodan)
 const SP=[
   // Gencal (2025) PhD thesis + Karahalil & Karsli (2017,)
-  {id:"ps",name:"Sarıçam (P. sylvestris)",ref:"Gencal 2025 + Karahalil 2017",fn:(h,cd)=>Math.max(0,-5.22+1.65*h+2.35*cd)},
-  {id:"ab",name:"Göknar (A. bornmuelleriana)",ref:"Gencal 2025 + Karahalil 2017",fn:(h,cd)=>Math.max(0,-6.27+1.80*h+2.06*cd)},
+  {id:"ps",name:"Sarıçam (P. sylvestris)",ref:"Gencal 2025",fn:(h,cd)=>Math.max(0,-5.22+1.65*h+2.35*cd)},
+  {id:"ab",name:"Göknar (A. bornmuelleriana)",ref:"Gencal 2025",fn:(h,cd)=>Math.max(0,-6.27+1.80*h+2.06*cd)},
   // Özçelik et al. (2014) DOI:10.3906/TAR-1304-115 — Gompertz, inverse-solved for d
   // Formula: h = 1.3 + a·exp(-b·exp(-c·d))  →  d = -ln(-ln((h-1.3)/a)/b)/c
   {id:"pb_me",name:"Kızılçam-Sahil (P. brutia ME)",ref:"Özçelik 2014",fn:(h,cd)=>{const a=22.527,b=1.823,c=0.062;if(h<=1.3||h>=a+1.3)return NaN;const inner=(h-1.3)/a;if(inner<=0||inner>=1)return NaN;const lni=-Math.log(inner)/b;if(lni<=0)return NaN;return Math.max(0,-Math.log(lni)/c);}},
@@ -218,7 +204,7 @@ const SP=[
   // Özçelik et al. (2014) — Pinus nigra Gompertz (Akdeniz sahil)
   {id:"pn",name:"Karaçam (P. nigra)",ref:"Özçelik 2014",fn:(h,cd)=>{const a=23.494,b=2.397,c=0.067;if(h<=1.3||h>=a+1.3)return NaN;const inner=(h-1.3)/a;if(inner<=0||inner>=1)return NaN;const lni=-Math.log(inner)/b;if(lni<=0)return NaN;return Math.max(0,-Math.log(lni)/c);}},
   // Ercanli (2015) DOI:10.5154/R.RCHSCFA.2015.02.006 — Schnute, Kestel-Bursa
-  // Assumes H_dom=H+2m, D_dom=35cm for estimation; inverse-solved numerically
+  // Assumes H_dom = max(H+1, 10) m and D_dom = 35 cm; inverse-solved numerically
   {id:"fo",name:"Kayın (F. orientalis)",ref:"Ercanli 2015 (Kestel-Bursa)",fn:(h,cd)=>{const a=1.659,b=0.051,H0=Math.max(h+1,10),D0=35;let lo=0.1,hi=150;for(let i=0;i<40;i++){const d=(lo+hi)/2;const num=1-Math.exp(-b*d),den=1-Math.exp(-b*D0);const hPred=Math.pow(Math.pow(1.3,a)+(Math.pow(H0,a)-Math.pow(1.3,a))*num/den,1/a);if(hPred<h)lo=d;else hi=d;}return Math.max(0,(lo+hi)/2);}},
   // Carus & Akguş (2018) DOI:10.18182/tjf.338311 — Prodan 1968 rational (m8)
   // h = 1.30 + d² / (a + b·d + c·d²)
