@@ -29,9 +29,13 @@ library(dplyr)
 
 Sys.setlocale("LC_ALL", "C")
 
-las_dir  <- "F:/lidar"
-fora_dir <- "F:/lidar/fora_exports"
-out_dir  <- "F:/lidar/output"
+# Paths are relative to this script's location so the validation is reproducible
+# from a checkout of the repository. Place the point-cloud tiles in validation/las/
+# and the FORA metric exports (shipped with the repo) in validation/fora_exports/.
+this_dir <- tryCatch(dirname(sys.frame(1)$ofile), error = function(e) getwd())
+las_dir  <- file.path(this_dir, "las")
+fora_dir <- file.path(this_dir, "fora_exports")
+out_dir  <- file.path(this_dir, "output")
 
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
