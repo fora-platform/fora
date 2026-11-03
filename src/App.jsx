@@ -1,8 +1,17 @@
-import{useState,useRef,useEffect,useCallback}from"react";
+import{useState,useRef,useEffect,useCallback,useMemo}from"react";
 import*as THREE from"three";
 
 import{parseLAS}from"./lasParser.js";
+import{getLasInfo}from"./lasInfo.js";
+import{standCarbon,treeCarbon,CARBON_DEFAULTS}from"./carbon.js";
+import{buildInventoryPDF}from"./inventoryReport.js";
+import{isLaz,makeLazToLas}from"./lazLoader.js";
+import lazWasmUrl from"laz-perf/lib/web/laz-perf.wasm?url";
+import{layerOf,classifyByHeight,layerSummary,VEG_THRESHOLDS,LAYER_COLOURS}from"./vegLayers.js";
 
+// LAZ: laz-perf (WebAssembly) is loaded only when a .laz is opened; Vite serves
+// the .wasm from its own assets folder, so tell the loader where it is
+const lazToLas=makeLazToLas(async()=>{const{createLazPerf}=await import("laz-perf");return createLazPerf({locateFile:p=>p.endsWith(".wasm")?lazWasmUrl:p});});
 
 // ASPRS classification colours (ground, low/med/high vegetation, building, water)
 const CLS_COL={0:[0.6,0.6,0.6],1:[0.7,0.7,0.7],2:[0.65,0.45,0.25],3:[0.55,0.75,0.35],
@@ -194,24 +203,24 @@ else{const a=v00*(1-dx)+v10*dx,b=v01*(1-dx)+v11*dx,g=a*(1-dy)+b*dy;out[i]=pts.z[
 // Inverse-solving used for pure h-d models (Gompertz, Schnute, Prodan)
 const SP=[
   // Gencal (2025) PhD thesis + Karahalil & Karsli (2017,)
-  {id:"ps",name:"Sarıçam (P. sylvestris)",ref:"Gencal 2025",fn:(h,cd)=>Math.max(0,-5.22+1.65*h+2.35*cd)},
-  {id:"ab",name:"Göknar (A. bornmuelleriana)",ref:"Gencal 2025",fn:(h,cd)=>Math.max(0,-6.27+1.80*h+2.06*cd)},
+  {id:"ps",nameTR:"Sarıçam (P. sylvestris)",nameEN:"Scots pine (P. sylvestris)",ref:"Gencal 2025",fn:(h,cd)=>Math.max(0,-5.22+1.65*h+2.35*cd)},
+  {id:"ab",nameTR:"Göknar (A. bornmuelleriana)",nameEN:"Uludağ fir (A. bornmuelleriana)",ref:"Gencal 2025",fn:(h,cd)=>Math.max(0,-6.27+1.80*h+2.06*cd)},
   // Özçelik et al. (2014) DOI:10.3906/TAR-1304-115 — Gompertz, inverse-solved for d
   // Formula: h = 1.3 + a·exp(-b·exp(-c·d))  →  d = -ln(-ln((h-1.3)/a)/b)/c
-  {id:"pb_me",name:"Kızılçam-Sahil (P. brutia ME)",ref:"Özçelik 2014",fn:(h,cd)=>{const a=22.527,b=1.823,c=0.062;if(h<=1.3||h>=a+1.3)return NaN;const inner=(h-1.3)/a;if(inner<=0||inner>=1)return NaN;const lni=-Math.log(inner)/b;if(lni<=0)return NaN;return Math.max(0,-Math.log(lni)/c);}},
-  {id:"pb_ie",name:"Kızılçam-İç (P. brutia IE)",ref:"Özçelik 2014",fn:(h,cd)=>{const a=25.911,b=2.004,c=0.045;if(h<=1.3||h>=a+1.3)return NaN;const inner=(h-1.3)/a;if(inner<=0||inner>=1)return NaN;const lni=-Math.log(inner)/b;if(lni<=0)return NaN;return Math.max(0,-Math.log(lni)/c);}},
-  {id:"pb_le",name:"Kızılçam-Göl (P. brutia LE)",ref:"Özçelik 2014",fn:(h,cd)=>{const a=24.207,b=1.465,c=0.038;if(h<=1.3||h>=a+1.3)return NaN;const inner=(h-1.3)/a;if(inner<=0||inner>=1)return NaN;const lni=-Math.log(inner)/b;if(lni<=0)return NaN;return Math.max(0,-Math.log(lni)/c);}},
+  {id:"pb_me",nameTR:"Kızılçam-Sahil (P. brutia ME)",nameEN:"Calabrian pine – coastal (P. brutia ME)",ref:"Özçelik 2014",fn:(h,cd)=>{const a=22.527,b=1.823,c=0.062;if(h<=1.3||h>=a+1.3)return NaN;const inner=(h-1.3)/a;if(inner<=0||inner>=1)return NaN;const lni=-Math.log(inner)/b;if(lni<=0)return NaN;return Math.max(0,-Math.log(lni)/c);}},
+  {id:"pb_ie",nameTR:"Kızılçam-İç (P. brutia IE)",nameEN:"Calabrian pine – inland (P. brutia IE)",ref:"Özçelik 2014",fn:(h,cd)=>{const a=25.911,b=2.004,c=0.045;if(h<=1.3||h>=a+1.3)return NaN;const inner=(h-1.3)/a;if(inner<=0||inner>=1)return NaN;const lni=-Math.log(inner)/b;if(lni<=0)return NaN;return Math.max(0,-Math.log(lni)/c);}},
+  {id:"pb_le",nameTR:"Kızılçam-Göl (P. brutia LE)",nameEN:"Calabrian pine – lake district (P. brutia LE)",ref:"Özçelik 2014",fn:(h,cd)=>{const a=24.207,b=1.465,c=0.038;if(h<=1.3||h>=a+1.3)return NaN;const inner=(h-1.3)/a;if(inner<=0||inner>=1)return NaN;const lni=-Math.log(inner)/b;if(lni<=0)return NaN;return Math.max(0,-Math.log(lni)/c);}},
   // Özçelik et al. (2014) — Pinus nigra Gompertz (Akdeniz sahil)
-  {id:"pn",name:"Karaçam (P. nigra)",ref:"Özçelik 2014",fn:(h,cd)=>{const a=23.494,b=2.397,c=0.067;if(h<=1.3||h>=a+1.3)return NaN;const inner=(h-1.3)/a;if(inner<=0||inner>=1)return NaN;const lni=-Math.log(inner)/b;if(lni<=0)return NaN;return Math.max(0,-Math.log(lni)/c);}},
+  {id:"pn",nameTR:"Karaçam (P. nigra)",nameEN:"Black pine (P. nigra)",ref:"Özçelik 2014",fn:(h,cd)=>{const a=23.494,b=2.397,c=0.067;if(h<=1.3||h>=a+1.3)return NaN;const inner=(h-1.3)/a;if(inner<=0||inner>=1)return NaN;const lni=-Math.log(inner)/b;if(lni<=0)return NaN;return Math.max(0,-Math.log(lni)/c);}},
   // Ercanli (2015) DOI:10.5154/R.RCHSCFA.2015.02.006 — Schnute, Kestel-Bursa
   // Assumes H_dom = max(H+1, 10) m and D_dom = 35 cm; inverse-solved numerically
-  {id:"fo",name:"Kayın (F. orientalis)",ref:"Ercanli 2015 (Kestel-Bursa)",fn:(h,cd)=>{const a=1.659,b=0.051,H0=Math.max(h+1,10),D0=35;let lo=0.1,hi=150;for(let i=0;i<40;i++){const d=(lo+hi)/2;const num=1-Math.exp(-b*d),den=1-Math.exp(-b*D0);const hPred=Math.pow(Math.pow(1.3,a)+(Math.pow(H0,a)-Math.pow(1.3,a))*num/den,1/a);if(hPred<h)lo=d;else hi=d;}return Math.max(0,(lo+hi)/2);}},
+  {id:"fo",nameTR:"Kayın (F. orientalis)",nameEN:"Oriental beech (F. orientalis)",ref:"Ercanli 2015 (Kestel-Bursa)",fn:(h,cd)=>{const a=1.659,b=0.051,H0=Math.max(h+1,10),D0=35;let lo=0.1,hi=150;for(let i=0;i<40;i++){const d=(lo+hi)/2;const num=1-Math.exp(-b*d),den=1-Math.exp(-b*D0);const hPred=Math.pow(Math.pow(1.3,a)+(Math.pow(H0,a)-Math.pow(1.3,a))*num/den,1/a);if(hPred<h)lo=d;else hi=d;}return Math.max(0,(lo+hi)/2);}},
   // Carus & Akguş (2018) DOI:10.18182/tjf.338311 — Prodan 1968 rational (m8)
   // h = 1.30 + d² / (a + b·d + c·d²)
   // Tarsus region afforestation stands, n=5885 trees, Çizelge 4 (model dev dataset)
   // Verified: d=25.7 → h=8.54 (paper mean 8.4) — PHYSICALLY VALID
   // Inverse solved numerically via bisection on h
-  {id:"pp",name:"Fıstıkçamı (P. pinea)",ref:"Carus & Akguş 2018 (Tarsus)",fn:(h,cd)=>{
+  {id:"pp",nameTR:"Fıstıkçamı (P. pinea)",nameEN:"Stone pine (P. pinea)",ref:"Carus & Akguş 2018 (Tarsus)",fn:(h,cd)=>{
     if(h<=1.3)return NaN;
     const a=-8.922602,b=3.254666,c=0.025050;
     // Find d such that 1.30 + d²/(a + b·d + c·d²) = h
@@ -229,7 +238,7 @@ const SP=[
   // h = Hdom · [(1-exp(b1·d))^b2 / (1-exp(b1·Ddom))^b2]
   // b1=-0.046, b2=0.650; defaults Hdom=25m, Ddom=40cm for mature Mediterranean stand
   // Proxy for Turkish Q. cerris (published Turkish coefs not yet available)
-  {id:"qc",name:"Meşe (Q. cerris) [BETA]",ref:"Cimini & Salvati 2011 (proxy)",experimental:true,fn:(h,cd)=>{
+  {id:"qc",nameTR:"Meşe (Q. cerris) [BETA]",nameEN:"Turkey oak (Q. cerris) [BETA]",ref:"Cimini & Salvati 2011 (proxy)",experimental:true,fn:(h,cd)=>{
     if(h<=1.3)return NaN;
     const b1=-0.046,b2=0.650,Hdom=25,Ddom=40;
     const den=Math.pow(1-Math.exp(b1*Ddom),b2);
@@ -261,12 +270,15 @@ const BIOMASS={
 const CL=["#e6194b","#3cb44b","#ffe119","#4363d8","#f58231","#911eb4","#42d4f4","#f032e6","#bfef45","#fabed4","#469990","#dcbeff","#9A6324","#800000","#aaffc3","#808000"];
 function hC(t){return[t<.5?0:(t-.5)*2,t<.5?t*2:(1-t)*2,t<.5?(.5-t)*2:0];}
 function nS(r){if(r<=0)return 1;const raw=r/6,mg=10**Math.floor(Math.log10(raw)),n=raw/mg;return(n<1.5?1:n<3.5?2:n<7.5?5:10)*mg;}
+// species display name in the current UI language
+const spName=(s,L)=>s?(L?s.nameTR:s.nameEN):"";
 function dlF(blob,name){const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(url),1000);}
 
 // --- citation ---
-const FORA_VERSION="1.8.0";
+const FORA_VERSION="1.9.0";
 const FORA_DOI="10.5281/zenodo.19546162";
 const FORA_REPO="https://github.com/fora-platform/fora";
+const FORA_PAPER_DOI="10.1016/j.softx.2026.102927";
 const FORA_BIBTEX=`@software{gencal_fora_2026,
   author    = {Gencal, Burhan},
   title     = {{FORA}: A browser-based platform for {UAV-LiDAR} forest point cloud analysis},
@@ -288,13 +300,18 @@ const[vwsMode,setVwsMode]=useState(false);const[vwsPreset,setVwsPreset]=useState
 const[vwsCustom,setVwsCustom]=useState({mode:"linear",a:2.5,b:0.05,c:0,min:2,max:5});
 const[tab,setTab]=useState("tools");const[theme,setTheme]=useState("dark");const[pan,setPan]=useState({x:0,y:0});const[zoom,setZoom]=useState(1);
 const[tMode,setTMode]=useState(false);const[tP1,setTP1]=useState(null);const[tP2,setTP2]=useState(null);const[tData,setTData]=useState(null);
-const[showLaz,setShowLaz]=useState(true);const[showCite,setShowCite]=useState(false);const[citeCopied,setCiteCopied]=useState(false);
+const[lasInfo,setLasInfo]=useState(null);const[segP,setSegP]=useState(null);const[vegThr,setVegThr]=useState({g:String(VEG_THRESHOLDS.groundMax),l:String(VEG_THRESHOLDS.lowMax),m:String(VEG_THRESHOLDS.mediumMax)});const[cOpt,setCOpt]=useState({cf:String(CARBON_DEFAULTS.carbonFraction),r:String(CARBON_DEFAULTS.rootToShoot)});const[showLaz,setShowLaz]=useState(false);const[showCite,setShowCite]=useState(false);const[citeCopied,setCiteCopied]=useState(false);
 const topR=useRef(null),sideR=useRef(null),transR=useRef(null),threeR=useRef(null),cleanR=useRef(null);
 const dragR=useRef({on:false,moved:false,sx:0,sy:0,px:0,py:0});
 const dR=useRef(),zR=useRef(),cR=useRef(),czR=useRef(),mR=useRef();
 dR.current=data;zR.current=zN;cR.current=clp;czR.current=clpZ;mR.current=met;
 const cam3D=useRef({theta:Math.PI/4,phi:Math.PI/3.2,dist:0});
 const aP=clp||data,aZ=clpZ||zN,aB=clp?clpB:bnd,L=lang==="TR";
+// vegetation layers: thresholds must be increasing, otherwise the defaults are used (and the panel says so)
+const vgN=parseFloat(vegThr.g),vlN=parseFloat(vegThr.l),vmN=parseFloat(vegThr.m),vOk=vgN>=0&&vlN>vgN&&vmN>vlN;
+const vg=vOk?vgN:VEG_THRESHOLDS.groundMax,vl=vOk?vlN:VEG_THRESHOLDS.lowMax,vm=vOk?vmN:VEG_THRESHOLDS.mediumMax;
+const vT=useMemo(()=>({groundMax:vg,lowMax:vl,mediumMax:vm}),[vg,vl,vm]);
+const vegSum=useMemo(()=>cMode==="veglayer"&&aZ?layerSummary(classifyByHeight(aZ,aZ.length,vT).counts):null,[cMode,aZ,vT]);
 const dk=theme==="dark"?"#080b10":"#f5f5f5",pn2=theme==="dark"?"#0f1319":"#fff",bd=theme==="dark"?"#1a2030":"#d4d4d4";
 const ac="#22d3ee",gn2="#34d399",og="#f59e0b",tx=theme==="dark"?"#c9d1d9":"#1a1a1a",txD=theme==="dark"?"#4a5568":"#9ca3af",txM=theme==="dark"?"#7b8594":"#6b7280";
 const BT=on=>({padding:"4px 10px",background:on?ac+"1a":pn2,color:on?ac:txM,border:`1px solid ${on?ac+"55":bd}`,borderRadius:4,cursor:"pointer",fontSize:10,fontFamily:"inherit",fontWeight:on?600:400});
@@ -303,9 +320,12 @@ const normRange=aZ?(()=>{let mx=0;const st=Math.max(1,Math.floor(aZ.length/2000)
 const hasTrans=tData&&tData.length>0;
 
 const handleFile=useCallback(async e=>{const f=e.target.files[0];if(!f)return;
-  if(f.name.toLowerCase().endsWith(".laz")){setMsg(L?"⚠ LAZ desteklenmiyor":"⚠ LAZ not supported");setShowLaz(true);return;}
-  setMsg("Loading...");setCC(null);setClp(null);setClpZ(null);setClpB(null);setSegs(null);setMet(null);setAreaMet(null);setAreaErr("");setSel(null);setView("2d");setZN(null);setPan({x:0,y:0});setZoom(1);setTP1(null);setTP2(null);setTData(null);cam3D.current={theta:Math.PI/4,phi:Math.PI/3.2,dist:0};
-  try{const buf=await f.arrayBuffer();const pts=parseLAS(buf);setData(pts);setBnd(gB(pts));setMsg(L?"Normalize...":"Normalizing...");await new Promise(r=>setTimeout(r,30));
+  setMsg("Loading...");setShowLaz(false);setCC(null);setClp(null);setClpZ(null);setClpB(null);setSegs(null);setMet(null);setAreaMet(null);setAreaErr("");setSel(null);setView("2d");setZN(null);setPan({x:0,y:0});setZoom(1);setTP1(null);setTP2(null);setTData(null);cam3D.current={theta:Math.PI/4,phi:Math.PI/3.2,dist:0};
+  try{let buf=await f.arrayBuffer();let lazN=null;
+    if(isLaz(f.name,buf)){setMsg(L?"LAZ açılıyor...":"Decompressing LAZ...");await new Promise(r=>setTimeout(r,30));
+      try{const r=await lazToLas(buf);buf=r.buffer;lazN=r.originalCount;}
+      catch(err){console.error(err);setShowLaz(true);throw new Error((L?"LAZ açılamadı: ":"Could not open LAZ: ")+err.message);}}
+    const pts=parseLAS(buf);if(lazN!=null){pts.nOrig=lazN;pts.format="LAZ";}setData(pts);setLasInfo({...getLasInfo(pts),fileName:f.name});setBnd(gB(pts));setMsg(L?"Normalize...":"Normalizing...");await new Promise(r=>setTimeout(r,30));
     if(dtmSrc==="external"&&extDTM){
       // DTM elevation sanity check
       const lasB=gB(pts);let dtmMin=1/0,dtmMax=-1/0;for(let i=0;i<extDTM.data.length;i++){const v=extDTM.data[i];if(isFinite(v)){if(v<dtmMin)dtmMin=v;if(v>dtmMax)dtmMax=v;}}
@@ -327,13 +347,28 @@ const handleDTM=useCallback(async e=>{const f=e.target.files[0];if(!f)return;set
     setExtDTM(dtm);setDtmSrc("external");setMsg(L?`✓ DTM yüklendi (${dtm.w}×${dtm.h} hücre)`:`✓ DTM loaded (${dtm.w}×${dtm.h} cells)`);
   }catch(err){setMsg("⚠ DTM: "+err.message);}},[L]);
 const hClip=useCallback(()=>{if(!data||!cc||!zN)return;const{pts:cp,zN:cz}=clipP(data,zN,cc.x,cc.y,cr,cs);if(!cp.x.length){setMsg("No points!");return;}setClp(cp);setClpZ(cz);setClpB(gB(cp));setSegs(null);setMet(null);setAreaMet(null);setAreaErr("");setPan({x:0,y:0});setZoom(1);},[data,zN,cc,cr,cs]);
-const hSeg=useCallback(()=>{const pts=cR.current||dR.current,za=czR.current||zR.current;if(!pts||!za)return;setMsg(L?"Segmentasyon...":"Segmenting...");setTimeout(()=>{const cCoef=vwsPreset==="custom"?customVWS(vwsCustom):null;const s=runSeg(pts,za,sCell,sMinH,sSR,vwsMode,vwsPreset,cCoef);setSegs(s);setCMode("segment");setMet(makeMet(pts,za,s.labels,s.count,crownMode));setMsg("");setTab("metrics");},50);},[sCell,sMinH,sSR,vwsMode,vwsPreset,vwsCustom,crownMode,L]);
+const hSeg=useCallback(()=>{const pts=cR.current||dR.current,za=czR.current||zR.current;if(!pts||!za)return;setMsg(L?"Segmentasyon...":"Segmenting...");setTimeout(()=>{const cCoef=vwsPreset==="custom"?customVWS(vwsCustom):null;const s=runSeg(pts,za,sCell,sMinH,sSR,vwsMode,vwsPreset,cCoef);setSegs(s);setCMode("segment");setMet(makeMet(pts,za,s.labels,s.count,crownMode));setSegP({cell:sCell,minH:sMinH,sr:sSR,vws:vwsMode,preset:vwsPreset,custom:vwsPreset==="custom"?{...vwsCustom}:null,crown:crownMode});setAreaMet(null);setAreaErr("");setMsg("");setTab("metrics");},50);},[sCell,sMinH,sSR,vwsMode,vwsPreset,vwsCustom,crownMode,L]);
 const hArea=useCallback(()=>{const pts=cR.current||dR.current,za=czR.current||zR.current,m=mR.current;
 // pass ROI geometry so density uses the true area, not the bounding box
 const roi=(clp&&cc)?{shape:cs,r:cr}:null;
 const r=makeArea(pts,za,m,roi);if(typeof r==="string"){setAreaErr(r);setAreaMet(null);}else{setAreaMet(r);setAreaErr("");}setMsg("");},[clp,cc,cs,cr]);
-const hSp=useCallback(()=>{if(!met)return;const s=SP.find(x=>x.id===sp);const bioKey=sp.startsWith("pb")?"pb":null;const bio=bioKey?BIOMASS[bioKey]:null;setMet(prev=>prev.map(m=>{const d=s?s.fn(m.h,m.cd):null;const bioOut=(bio&&d&&d>0&&m.h>0)?{bm_total:bio.total(d,m.h),bm_stem:bio.stem(d,m.h),bm_branch:bio.branches(d,m.h),bm_bark:bio.bark(d,m.h),bm_needle:bio.needles(d,m.h)}:{};return{...m,dbhModel:d,species:s?.name,...bioOut};}));},[met,sp]);
-const hCSV=useCallback(()=>{if(!met)return;let csv="ID,H_auto,CD_auto,CPA,CD_bbox,CD_convex,CD_concave,CPA_bbox,CPA_convex,CPA_concave,CrownMethod,CenterX,CenterY,DBH_model,H_manual,CD_manual,DBH_manual,Species,Biomass_total_kg,Biomass_stem_kg,Biomass_branch_kg,Biomass_bark_kg,Biomass_needle_kg,Points\n";csv+=met.map(m=>`${m.id},${m.h.toFixed(2)},${m.cd.toFixed(2)},${m.cpa.toFixed(2)},${m.cdBbox?.toFixed(2)||""},${m.cdConvex?.toFixed(2)||""},${m.cdConcave?.toFixed(2)||""},${m.cpaBbox?.toFixed(2)||""},${m.cpaConvex?.toFixed(2)||""},${m.cpaConcave?.toFixed(2)||""},${m.crownMethod||""},${m.cx.toFixed(2)},${m.cy.toFixed(2)},${m.dbhModel?.toFixed(1)||""},${m.hManual||""},${m.cdManual||""},${m.dbhManual||""},${m.species||""},${m.bm_total?.toFixed(2)||""},${m.bm_stem?.toFixed(2)||""},${m.bm_branch?.toFixed(2)||""},${m.bm_bark?.toFixed(2)||""},${m.bm_needle?.toFixed(2)||""},${m.cnt}`).join("\n");if(areaMet)csv+="\n\nAREA_METRICS\n"+Object.entries(areaMet).map(([k,v])=>`${k},${typeof v==="number"?v.toFixed(3):v}`).join("\n");dlF(new Blob(["\uFEFF"+csv],{type:"text/csv"}),"fora_tree_metrics.csv");},[met,areaMet]);
+// carbon (IPCC): invalid inputs fall back to the defaults, and the panel says so
+const cfIn=parseFloat(cOpt.cf),rIn=parseFloat(cOpt.r),cfOk=cfIn>0&&cfIn<=1,rOk=rIn>=0&&rIn<=2;
+const cfV=cfOk?cfIn:CARBON_DEFAULTS.carbonFraction,rV=rOk?rIn:CARBON_DEFAULTS.rootToShoot;
+const carb=useMemo(()=>met&&met.some(m=>m.bm_total>0)?standCarbon(met,{carbonFraction:cfV,rootToShoot:rV,areaHa:areaMet?areaMet.area/10000:null}):null,[met,cfV,rV,areaMet]);
+const hSp=useCallback(()=>{if(!met)return;const s=SP.find(x=>x.id===sp);const bioKey=sp.startsWith("pb")?"pb":null;const bio=bioKey?BIOMASS[bioKey]:null;setMet(prev=>prev.map(m=>{const d=s?s.fn(m.h,m.cd):null;const bioOut=(bio&&d&&d>0&&m.h>0)?{bm_total:bio.total(d,m.h),bm_stem:bio.stem(d,m.h),bm_branch:bio.branches(d,m.h),bm_bark:bio.bark(d,m.h),bm_needle:bio.needles(d,m.h)}:{bm_total:null,bm_stem:null,bm_branch:null,bm_bark:null,bm_needle:null};return{...m,dbhModel:d,species:s?.nameEN,speciesId:s?.id,...bioOut};}));},[met,sp]);
+const hCSV=useCallback(()=>{if(!met)return;const cr=m=>{if(!(m.bm_total>0))return",,";const c=treeCarbon(m.bm_total,{carbonFraction:cfV,rootToShoot:rV});return c.bgbKg.toFixed(1)+","+c.carbonKg.toFixed(1)+","+c.co2eqKg.toFixed(1);};let csv="ID,H_auto,CD_auto,CPA,CD_bbox,CD_convex,CD_concave,CPA_bbox,CPA_convex,CPA_concave,CrownMethod,CenterX,CenterY,DBH_model,H_manual,CD_manual,DBH_manual,Species,Biomass_total_kg,Biomass_stem_kg,Biomass_branch_kg,Biomass_bark_kg,Biomass_needle_kg,Points,BGB_kg,Carbon_kgC,CO2eq_kg\n";csv+=met.map(m=>`${m.id},${m.h.toFixed(2)},${m.cd.toFixed(2)},${m.cpa.toFixed(2)},${m.cdBbox?.toFixed(2)||""},${m.cdConvex?.toFixed(2)||""},${m.cdConcave?.toFixed(2)||""},${m.cpaBbox?.toFixed(2)||""},${m.cpaConvex?.toFixed(2)||""},${m.cpaConcave?.toFixed(2)||""},${m.crownMethod||""},${m.cx.toFixed(2)},${m.cy.toFixed(2)},${Number.isFinite(m.dbhModel)?m.dbhModel.toFixed(1):""},${m.hManual||""},${m.cdManual||""},${m.dbhManual||""},${m.species||""},${m.bm_total?.toFixed(2)||""},${m.bm_stem?.toFixed(2)||""},${m.bm_branch?.toFixed(2)||""},${m.bm_bark?.toFixed(2)||""},${m.bm_needle?.toFixed(2)||""},${m.cnt},${cr(m)}`).join("\n");if(areaMet)csv+="\n\nAREA_METRICS\n"+Object.entries(areaMet).map(([k,v])=>`${k},${typeof v==="number"?v.toFixed(3):v}`).join("\n");if(carb)csv+="\n\nCARBON_ESTIMATE\n"+[["status","estimated (IPCC methodology) - not validated with field measurements"],["agb_source","Sönmez et al. 2016 (Pinus brutia)"],["coefficients_source","IPCC 2006 Guidelines Vol.4"],["root_to_shoot",rV],["carbon_fraction",cfV],["co2_ratio","44/12 (3.6667)"],["trees_with_biomass",carb.treesWithBiomass],["trees_total",met.length],["agb_t",carb.agb_t.toFixed(3)],["bgb_t",carb.bgb_t.toFixed(3)],["carbon_tC",carb.carbon_tC.toFixed(3)],["co2eq_tCO2",carb.co2eq_tCO2.toFixed(3)]].map(([k,v])=>k+","+v).join("\n");dlF(new Blob(["\uFEFF"+csv],{type:"text/csv"}),"fora_tree_metrics.csv");},[met,areaMet,carb,cfV,rV]);
+const hPDF=useCallback(async()=>{if(!met)return;setMsg(L?"PDF hazırlanıyor...":"Building PDF...");
+try{const{jsPDF}=await import("jspdf");
+const ap=SP.find(s=>s.id===met.find(m=>m.speciesId)?.speciesId);
+const CROWN={bbox:"bounding box",convex:"convex hull",concave:"concave hull"};
+const win=segP?(segP.vws?(segP.custom?`variable window, custom ${segP.custom.mode} (a=${segP.custom.a}, b=${segP.custom.b}${segP.custom.mode==="quad"?`, c=${segP.custom.c}`:`, ${segP.custom.min}-${segP.custom.max} m`})`:`variable window, ${VWS[segP.preset]?.name||segP.preset}`):`fixed search radius ${segP.sr} m`):null;
+const methodLines=[segP?`Segmentation: CHM cell ${segP.cell} m, min. tree height ${segP.minH} m, ${win}; crown outline: ${CROWN[segP.crown]||segP.crown}`:null,`Ground: ${dtmSrc==="external"?"external DTM":"automatic (grid min-Z)"}`].filter(Boolean);
+const AREA_SRC={circle:"clip circle",rect:"clip rectangle",bbox:"bounding box"};
+const base=(lasInfo?.fileName||"").replace(/\.(las|laz)$/i,"");
+const doc=buildInventoryPDF(met,{projectName:base||"FORA inventory",fileName:lasInfo?.fileName,areaHa:areaMet?areaMet.area/10000:null,areaSource:areaMet?AREA_SRC[areaMet.area_source]:null,species:ap?`${ap.nameEN}, ${ap.ref}`:null,methodLines,carbon:carb},jsPDF);
+doc.save(`${base||"fora"}_inventory.pdf`);setMsg("");}
+catch(err){console.error(err);setMsg((L?"⚠ PDF oluşturulamadı: ":"⚠ PDF failed: ")+err.message);}},[met,lasInfo,areaMet,carb,segP,dtmSrc,L]);
 const hAreaCSV=useCallback(()=>{if(!areaMet)return;let csv="Metric,Value\n";Object.entries(areaMet).forEach(([k,v])=>{csv+=`${k},${typeof v==="number"?v.toFixed(4):v}\n`;});dlF(new Blob(["\uFEFF"+csv],{type:"text/csv"}),"fora_area_metrics.csv");},[areaMet]);
 const hImg=useCallback(()=>{if(view==="3d"){const el=threeR.current;if(!el)return;const wc=el.querySelector("canvas");if(!wc)return;try{const url=wc.toDataURL("image/png");const a=document.createElement("a");a.href=url;a.download="fora_3d.png";document.body.appendChild(a);a.click();document.body.removeChild(a);}catch(err){setMsg("Export failed");}
 }else{const cv=topR.current;if(!cv)return;const W=cv.width,H=cv.height;const tmp=document.createElement("canvas");tmp.width=W;tmp.height=H;const ctx=tmp.getContext("2d");ctx.drawImage(cv,0,0);
@@ -362,6 +397,7 @@ else if(cMode==="segment"&&segs){const l=segs.labels[i];ctx.fillStyle=l<=0?(them
 else if(cMode==="normalized"&&aZ){const t=Math.min(1,aZ[i]/30);const[cr2,cg,cb]=hC(t);ctx.fillStyle=`rgb(${cr2*255|0},${cg*255|0},${cb*255|0})`;}
 else if(cMode==="intensity"){const v=Math.min(255,aP.intensity[i]);ctx.fillStyle=`rgb(${v},${v},${v})`;}
 else if(cMode==="classification"){const[cr2,cg,cb]=clsCol(aP.classification[i]);ctx.fillStyle=`rgb(${cr2*255|0},${cg*255|0},${cb*255|0})`;}
+else if(cMode==="veglayer"&&aZ){const c=LAYER_COLOURS[layerOf(aZ[i],vT)];ctx.fillStyle=`rgb(${c[0]},${c[1]},${c[2]})`;}
 else{const t=aB.z1===aB.z0?.5:(aP.z[i]-aB.z0)/(aB.z1-aB.z0);const[cr2,cg,cb]=hC(t);ctx.fillStyle=`rgb(${cr2*255|0},${cg*255|0},${cb*255|0})`;}
 ctx.fillRect(px,py,ptSz,ptSz);}
 if(!clp&&cc&&isTop){const cx2=oX+(cc.x-xMn)*sc,cy2=oY-(cc.y-yMn)*sc,r2=cr*sc;ctx.shadowColor="#00ffff";ctx.shadowBlur=12;ctx.strokeStyle="#00ffff";ctx.lineWidth=3;ctx.setLineDash([8,4]);ctx.beginPath();if(cs==="circle")ctx.arc(cx2,cy2,r2,0,Math.PI*2);else ctx.rect(cx2-r2,cy2-r2,r2*2,r2*2);ctx.stroke();ctx.setLineDash([]);ctx.shadowBlur=0;ctx.fillStyle="#00ffff";ctx.beginPath();ctx.arc(cx2,cy2,6,0,Math.PI*2);ctx.fill();ctx.font="bold 14px monospace";ctx.fillText(`r=${cr}m`,cx2+10,cy2-10);}
@@ -383,7 +419,7 @@ ctx.beginPath();for(let i=0;i<sorted.length;i++){const x=pL+sorted[i].dist*sx,y=
 for(const p of tData){const px=pL+p.dist*sx,py=H-pBt-p.zN*sz,t=mZ>0?p.zN/mZ:0;const[r,g,b2]=hC(t);ctx.fillStyle=`rgb(${r*255|0},${g*255|0},${b2*255|0})`;ctx.fillRect(px-1,py-1,2,2);}
 if(mZ>1.3){const y=H-pBt-1.3*sz;ctx.strokeStyle="#f5920055";ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(pL,y);ctx.lineTo(W-pRt,y);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle="#f59200";ctx.font="10px monospace";ctx.fillText("1.3m",W-pRt+2,y+4);}
 ctx.fillStyle=ac;ctx.font="bold 12px monospace";ctx.fillText(`Transect: ${mD2.toFixed(1)}m | Hmax: ${mZ.toFixed(1)}m | ${tData.length}pts`,pL,14);}
-},[aP,aB,aZ,cc,cr,cs,cMode,segs,ptSz,ptPct,clp,sel,pan,zoom,theme,dk,txD,tP1,tP2,tData]);
+},[aP,aB,aZ,cc,cr,cs,cMode,segs,ptSz,ptPct,clp,sel,pan,zoom,theme,dk,txD,tP1,tP2,tData,vT]);
 useEffect(()=>{if(view==="2d")draw2D();},[draw2D,view]);
 // Transect canvas, açılma animasyonu (height 0→160) bittikten sonra 0-yükseklikli
 // canvas'a çizildiği için ilk anda boş kalıyordu. Konteyner gerçek yüksekliğe
@@ -408,6 +444,7 @@ else if(cMode==="segment"&&segs){const l=segs.labels[i];if(l<=0){col[j*3]=.06;co
 else if(cMode==="normalized"&&aZ){const t=Math.min(1,aZ[i]/30);const[r,g,b2]=hC(t);col[j*3]=r;col[j*3+1]=g;col[j*3+2]=b2;}
 else if(cMode==="intensity"){const v=Math.min(1,aP.intensity[i]/255);col[j*3]=v;col[j*3+1]=v;col[j*3+2]=v;}
 else if(cMode==="classification"){const[r2,g2,b3]=clsCol(aP.classification[i]);col[j*3]=r2;col[j*3+1]=g2;col[j*3+2]=b3;}
+else if(cMode==="veglayer"&&aZ){const c=LAYER_COLOURS[layerOf(aZ[i],vT)];col[j*3]=c[0]/255;col[j*3+1]=c[1]/255;col[j*3+2]=c[2]/255;}
 else{const t=aB.z1===aB.z0?.5:(aP.z[i]-aB.z0)/(aB.z1-aB.z0);const[r,g,b2]=hC(t);col[j*3]=r;col[j*3+1]=g;col[j*3+2]=b2;}j++;}
 const geom=new THREE.BufferGeometry();geom.setAttribute("position",new THREE.BufferAttribute(pos,3));geom.setAttribute("color",new THREE.BufferAttribute(col,3));
 const mat=new THREE.PointsMaterial({size:ptSz*.8,vertexColors:true,sizeAttenuation:true});scene.add(new THREE.Points(geom,mat));
@@ -419,7 +456,7 @@ const oU=()=>{drag=false;};const oW=e=>{dist*=e.deltaY>0?1.08:.92;dist=Math.max(
 dE.addEventListener("mousedown",oD);dE.addEventListener("mousemove",oM);dE.addEventListener("mouseup",oU);dE.addEventListener("mouseleave",oU);dE.addEventListener("wheel",oW,{passive:false});
 let aId;const an=()=>{aId=requestAnimationFrame(an);ren.render(scene,cam);};an();
 cleanR.current=()=>{cam3D.current={theta,phi,dist};cancelAnimationFrame(aId);dE.removeEventListener("mousedown",oD);dE.removeEventListener("mousemove",oM);dE.removeEventListener("mouseup",oU);dE.removeEventListener("mouseleave",oU);dE.removeEventListener("wheel",oW);geom.dispose();mat.dispose();ren.dispose();try{ren.forceContextLoss();}catch(_){}if(el.contains(dE))el.removeChild(dE);};
-return()=>{if(cleanR.current){cleanR.current();cleanR.current=null;}};},[view,aP,aB,aZ,cMode,segs,sel,ptSz,ptPct,theme]);
+return()=>{if(cleanR.current){cleanR.current();cleanR.current=null;}};},[view,aP,aB,aZ,cMode,segs,sel,ptSz,ptPct,theme,vT]);
 
 // --- mouse ---
 const handleMouse=useCallback((e,act)=>{const c=topR.current;if(!c||!c._tr)return;const rect=c.getBoundingClientRect();
@@ -439,7 +476,7 @@ if(!data)return(
 <div style={{fontSize:22,fontWeight:800,color:ac,letterSpacing:4}}>◆ FORA</div>
 <div style={{fontSize:11,color:txD,letterSpacing:1}}>FORest Analysis Platform</div>
 <label style={{padding:"12px 36px",background:ac+"15",color:ac,border:`1px solid ${ac}44`,borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,marginTop:10}}>
-{L?"LAS Dosyası Yükle":"Load LAS File"}<input type="file" accept=".las,.laz" onChange={handleFile} style={{display:"none"}}/></label>
+{L?"LAS / LAZ Dosyası Yükle":"Load LAS / LAZ File"}<input type="file" accept=".las,.laz" onChange={handleFile} style={{display:"none"}}/></label>
 <div style={{padding:10,background:pn2,border:`1px solid ${bd}`,borderRadius:6,maxWidth:380,marginTop:4}}>
 <div style={{fontSize:10,fontWeight:700,color:txM,marginBottom:6,letterSpacing:.5}}>{L?"YER MODELİ (OPSİYONEL)":"GROUND MODEL (OPTIONAL)"}</div>
 <label style={{fontSize:10,color:tx,display:"flex",alignItems:"center",gap:4,marginBottom:3,cursor:"pointer"}}><input type="radio" name="dtmSrcL" checked={dtmSrc==="auto"} onChange={()=>setDtmSrc("auto")} style={{margin:0}}/>{L?"Otomatik (grid min-Z)":"Auto (grid min-Z)"}</label>
@@ -448,12 +485,12 @@ if(!data)return(
 </div>
 {msg&&<div style={{color:msg.startsWith("⚠")?og:msg.startsWith("✓")?gn2:ac,fontSize:11,maxWidth:400,textAlign:"center"}}>{msg}</div>}
 {showLaz&&<div style={{fontSize:9,color:txM,lineHeight:1.8,padding:8,background:dk=="#080b10"?"#111":"#eee",borderRadius:6,maxWidth:360,marginTop:4}}>
-<div style={{fontSize:10,fontWeight:700,color:og,marginBottom:6}}>LAZ → LAS</div>
+<div style={{fontSize:10,fontWeight:700,color:og,marginBottom:6}}>{L?"LAZ açılamadı. LAS'a dönüştürüp yükleyebilirsiniz:":"Could not open the LAZ. Convert it to LAS and load that:"}</div>
 <div><b>CloudCompare:</b> File→Open .laz→Save As .las</div>
 <div><b>R:</b> <code>readLAS("f.laz") |&gt; writeLAS("f.las")</code></div>
 <div><b>LAStools:</b> <code>las2las -i f.laz -o f.las</code></div>
 <div><b>PDAL:</b> <code>pdal translate f.laz f.las</code></div></div>}
-<div style={{color:txD,fontSize:9,marginTop:4}}>LAS 1.2–1.4</div>
+<div style={{color:txD,fontSize:9,marginTop:4}}>LAS / LAZ 1.2–1.4</div>
 <div style={{display:"flex",gap:8,marginTop:8}}><button style={BT(L)} onClick={()=>setLang("TR")}>TR</button><button style={BT(!L)} onClick={()=>setLang("EN")}>EN</button></div>
 {/* ATIF FOOTER */}
 <div style={{marginTop:18,paddingTop:12,borderTop:`1px solid ${bd}`,maxWidth:420,textAlign:"center"}}>
@@ -462,6 +499,7 @@ if(!data)return(
 <div style={{display:"flex",gap:12,justifyContent:"center",marginTop:6,fontSize:9}}>
 <a href={`https://doi.org/${FORA_DOI}`} target="_blank" rel="noopener noreferrer" style={{color:ac,textDecoration:"none"}}>DOI</a>
 <a href={FORA_REPO} target="_blank" rel="noopener noreferrer" style={{color:ac,textDecoration:"none"}}>GitHub</a>
+<a href={`${FORA_REPO}/blob/main/docs/${L?"KILAVUZ":"MANUAL"}.md`} target="_blank" rel="noopener noreferrer" style={{color:ac,textDecoration:"none"}}>{L?"Kılavuz":"Manual"}</a>
 <button onClick={()=>setShowCite(s=>!s)} style={{background:"none",border:"none",color:ac,cursor:"pointer",fontSize:9,fontFamily:"inherit",padding:0,textDecoration:"underline"}}>{L?"Atıf":"Cite"}</button>
 </div>
 {showCite&&(<div style={{marginTop:8,padding:8,background:pn2,border:`1px solid ${bd}`,borderRadius:6,textAlign:"left"}}>
@@ -469,7 +507,7 @@ if(!data)return(
 <span style={{fontSize:9,fontWeight:700,color:txM}}>BibTeX</span>
 <button onClick={()=>{navigator.clipboard?.writeText(FORA_BIBTEX).then(()=>{setCiteCopied(true);setTimeout(()=>setCiteCopied(false),1500);});}} style={{...BT(citeCopied),fontSize:9,padding:"2px 8px"}}>{citeCopied?(L?"✓ Kopyalandı":"✓ Copied"):(L?"Kopyala":"Copy")}</button></div>
 <pre style={{fontSize:8,color:tx,margin:0,whiteSpace:"pre-wrap",wordBreak:"break-word",fontFamily:"inherit",lineHeight:1.4}}>{FORA_BIBTEX}</pre>
-<div style={{fontSize:8,color:txD,marginTop:6,lineHeight:1.5}}>{L?"Yazılımı kullanırsanız lütfen yukarıdaki Zenodo kaydına atıf verin. Eşlik eden makale yayımlandığında bu bilgi güncellenecektir.":"If you use this software, please cite the Zenodo record above. This will be updated when the accompanying paper is published."}</div>
+<div style={{fontSize:8,color:txD,marginTop:6,lineHeight:1.5}}>{L?"Yazılımı kullanırsanız lütfen SoftwareX makalesine ve yukarıdaki Zenodo kaydına atıf verin. Makale: ":"If you use this software, please cite the SoftwareX article and the Zenodo record above. Article: "}<a href={`https://doi.org/${FORA_PAPER_DOI}`} target="_blank" rel="noopener noreferrer" style={{color:ac}}>doi.org/{FORA_PAPER_DOI}</a></div>
 </div>)}
 </div></div>);
 
@@ -482,7 +520,8 @@ return(
 {segs&&<span title={L?"Ölçülen ağaç (≥5 nokta) / bulunan segment":"Measured trees (≥5 points) / detected segments"} style={{fontSize:9,color:gn2,background:gn2+"11",padding:"1px 5px",borderRadius:3}}>{met?`${met.length} / ${segs.count}`:segs.count} {L?"ağaç":"trees"}</span>}
 {msg&&<span style={{color:og}}>{msg}</span>}<div style={{flex:1}}/>
 <div style={{display:"flex",border:`1px solid ${bd}`,borderRadius:4,overflow:"hidden"}}><button style={{...BT(view==="2d"),borderRadius:0,border:"none",padding:"3px 12px"}} onClick={()=>setView("2d")}>2D</button><button style={{...BT(view==="3d"),borderRadius:0,border:"none",padding:"3px 12px",borderLeft:`1px solid ${bd}`}} onClick={()=>setView("3d")}>3D</button></div>
-<select style={IN} value={cMode} onChange={e=>setCMode(e.target.value)}><option value="height">{L?"Yükseklik":"Height"}</option><option value="normalized">Normalize</option>{aP.hasRGB&&<option value="rgb">RGB</option>}<option value="intensity">{L?"Yoğunluk":"Intensity"}</option><option value="classification">{L?"Sınıf":"Classification"}</option>{segs&&<option value="segment">Segment</option>}</select>
+<select style={IN} value={cMode} onChange={e=>{setCMode(e.target.value);if(e.target.value==="veglayer")setTab("tools");}}><option value="height">{L?"Yükseklik":"Height"}</option><option value="normalized">Normalize</option>{aP.hasRGB&&<option value="rgb">RGB</option>}<option value="intensity">{L?"Yoğunluk":"Intensity"}</option><option value="classification">{L?"Sınıf":"Classification"}</option><option value="veglayer">{L?"Vejetasyon katmanı":"Vegetation layers"}</option>{segs&&<option value="segment">Segment</option>}</select>
+<a href={`${FORA_REPO}/blob/main/docs/${L?"KILAVUZ":"MANUAL"}.md`} target="_blank" rel="noopener noreferrer" aria-label={L?"Kullanım kılavuzu":"User manual"} title={L?"Kullanım kılavuzu":"User manual"} style={{...BT(false),textDecoration:"none"}}>?</a>
 <button aria-label={L?"Tema değiştir":"Toggle theme"} title={L?"Tema değiştir":"Toggle theme"} style={BT(theme==="light")} onClick={()=>setTheme(t=>t==="dark"?"light":"dark")}>{theme==="dark"?"☀":"🌙"}</button>
 <div style={{display:"flex",border:`1px solid ${bd}`,borderRadius:4,overflow:"hidden"}}><button style={{...BT(L),borderRadius:0,border:"none",padding:"3px 8px"}} onClick={()=>setLang("TR")}>TR</button><button style={{...BT(!L),borderRadius:0,border:"none",padding:"3px 8px",borderLeft:`1px solid ${bd}`}} onClick={()=>setLang("EN")}>EN</button></div>
 {clp&&<button aria-label={L?"Kırpmayı sıfırla":"Reset clip"} title={L?"Kırpmayı sıfırla":"Reset clip"} style={BT(false)} onClick={hReset}>↩</button>}
@@ -522,8 +561,19 @@ return(
 {tab==="tools"&&(<><Sc t={L?"Görüntü":"Display"}>
 <Rw l={L?"Boyut":"Size"}><input type="range" min={.5} max={5} step={.25} value={ptSz} onChange={e=>setPtSz(+e.target.value)} style={{flex:1}}/><span style={{fontSize:9,color:txM,width:20}}>{ptSz}</span></Rw>
 <Rw l={L?"Örnekleme":"Sample"}><input type="range" min={10} max={100} step={5} value={ptPct} onChange={e=>setPtPct(+e.target.value)} style={{flex:1}}/><span style={{fontSize:9,color:txM,width:28}}>{ptPct}%</span></Rw></Sc>
+{cMode==="veglayer"&&<Sc t={L?"Vejetasyon Katmanı":"Vegetation Layers"}>
+<div style={{display:"flex",flexWrap:"wrap",gap:8,fontSize:9,color:txM,marginBottom:6}}>
+{[["g",L?"Zemin <":"Ground <"],["l",L?"Düşük <":"Low <"],["m",L?"Orta <":"Medium <"]].map(([k,lab])=><label key={k} style={{display:"flex",alignItems:"center",gap:3}}>{lab}<input type="number" step="0.5" min="0" value={vegThr[k]} onChange={e=>setVegThr({...vegThr,[k]:e.target.value})} style={{...IN,width:40,padding:"1px 3px"}}/>m</label>)}
+{(vegThr.g!==String(VEG_THRESHOLDS.groundMax)||vegThr.l!==String(VEG_THRESHOLDS.lowMax)||vegThr.m!==String(VEG_THRESHOLDS.mediumMax))&&<button style={{...BT(false),fontSize:8,padding:"1px 6px"}} onClick={()=>setVegThr({g:String(VEG_THRESHOLDS.groundMax),l:String(VEG_THRESHOLDS.lowMax),m:String(VEG_THRESHOLDS.mediumMax)})}>{L?"Varsayılana dön":"Reset"}</button>}</div>
+{!vOk&&<div style={{fontSize:8,color:og,marginBottom:4}}>{L?"Eşikler artan sırada olmalı (zemin < düşük < orta); varsayılanlar kullanılıyor.":"Thresholds must increase (ground < low < medium); using the defaults."}</div>}
+{vegSum&&<div style={{fontSize:9,color:txM,lineHeight:1.8}}>
+{[[0,L?`Zemin / diğer (< ${vg} m)`:`Ground / other (< ${vg} m)`,vegSum.total-vegSum.vegetationPoints],[1,L?`Düşük (${vg}–${vl} m)`:`Low (${vg}–${vl} m)`,vegSum.layers[0].count],[2,L?`Orta (${vl}–${vm} m)`:`Medium (${vl}–${vm} m)`,vegSum.layers[1].count],[3,L?`Yüksek (> ${vm} m)`:`High (> ${vm} m)`,vegSum.layers[2].count]].map(([k,lab,cnt])=>{const c=LAYER_COLOURS[k];return(
+<div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:7,height:7,borderRadius:2,background:`rgb(${c.join(",")})`,display:"inline-block"}}/>{lab}</span><span style={{color:tx}}>{vegSum.total>0?(100*cnt/vegSum.total).toFixed(1):"0.0"}%</span></div>);})}
+<div style={{marginTop:4}}>{L?`Vejetasyon noktalarının %${(vegSum.understoreyFraction*100).toFixed(1)}'i kanopi altında (düşük + orta).`:`${(vegSum.understoreyFraction*100).toFixed(1)}% of vegetation points are below the canopy (low + medium).`}</div></div>}
+<div style={{fontSize:8,color:txM,marginTop:6,padding:6,background:ac+"11",border:`1px solid ${ac}33`,borderRadius:4,lineHeight:1.4}}>{L?"Katmanlar normalize yüksekliğe (zeminden yükseklik) göre ayrılır; dosyadaki sınıf alanı kullanılmaz. Varsayılan eşikler yaygın ormancılık ayrımıdır, alanınıza göre değiştirebilirsiniz. Zemini bulunamayan noktalar 'diğer' sayılır. Yüzdeler görüntülenen alandaki (kırpıldıysa kırpılan) tüm noktalara göredir.":"Layers are split by normalised height (height above ground); the file's class field is not used. The default thresholds are a common forestry split; adjust them to your site. Points with no ground estimate count as 'other'. Percentages are of all points in the current area (the clip, if any)."}</div>
+</Sc>}
 <Sc t={L?"Yer (DTM)":"Ground (DTM)"}>
-<div style={{fontSize:9,color:txM,marginBottom:4,lineHeight:1.4}}>{L?"Yeni dosyada normalize için":"Used when loading a new file"}</div>
+<div style={{fontSize:9,color:txM,marginBottom:4,lineHeight:1.4}}>{L?"Seçim, bir sonraki dosya yüklemesinde uygulanır. Mevcut dosyaya uygulamak için dosyayı yeniden yükleyin.":"Applied the next time a file is loaded. To apply it to the current file, load the file again."}</div>
 <label style={{fontSize:10,color:tx,display:"flex",alignItems:"center",gap:4,marginBottom:3,cursor:"pointer"}}><input type="radio" name="dtmSrc" checked={dtmSrc==="auto"} onChange={()=>setDtmSrc("auto")} style={{margin:0}}/>{L?"Otomatik (grid min-Z)":"Auto (grid min-Z)"}</label>
 <label style={{fontSize:10,color:tx,display:"flex",alignItems:"center",gap:4,marginBottom:3,cursor:"pointer"}}><input type="radio" name="dtmSrc" checked={dtmSrc==="external"} onChange={()=>setDtmSrc("external")} style={{margin:0}}/>{L?"Harici DTM":"External DTM"}</label>
 {dtmSrc==="external"&&(<><label style={{padding:"4px 8px",background:ac+"15",color:ac,border:`1px solid ${ac}44`,borderRadius:4,cursor:"pointer",fontSize:9,display:"inline-block",marginTop:4,marginBottom:4}}>📁 {extDTM?(L?"DTM Değiştir":"Change DTM"):(L?"DTM Seç":"Select DTM")}<input type="file" accept=".tif,.tiff,.asc,.txt,.xyz,.csv" onChange={handleDTM} style={{display:"none"}}/></label><div style={{fontSize:8,color:txM,lineHeight:1.4}}>{L?".tif (GeoTIFF), .asc/.txt (ESRI) veya .xyz/.csv (zemin)":".tif (GeoTIFF), .asc/.txt (ESRI), or .xyz/.csv (ground)"}</div>{extDTM&&<div style={{fontSize:9,color:gn2,marginTop:3,fontWeight:600}}>✓ DTM {extDTM.w}×{extDTM.h}</div>}</>)}
@@ -531,6 +581,12 @@ return(
 <Sc t={L?"Bilgi":"Info"}><div style={{fontSize:9,color:txM,lineHeight:1.8}}>
 {[["Pts",`${(data.nOrig/1e6).toFixed(2)}M → ${(aP.x.length/1e3).toFixed(0)}K`],["Norm","✓ "+normRange],["Z raw",`${aB.z0.toFixed(1)}→${aB.z1.toFixed(1)}`],["X",`${aB.x0.toFixed(1)}→${aB.x1.toFixed(1)}`],["Y",`${aB.y0.toFixed(1)}→${aB.y1.toFixed(1)}`],[L?"Alan":"Area",`${((aB.x1-aB.x0)*(aB.y1-aB.y0)).toFixed(0)} m²`]].map(([k,v])=>
 <div key={k} style={{display:"flex",justifyContent:"space-between"}}><span>{k}</span><span style={{color:tx}}>{v}</span></div>)}</div></Sc>
+{lasInfo&&<Sc t={L?"LAS Dosyası":"LAS File"}><div style={{fontSize:9,color:txM,lineHeight:1.8}}>
+{[[L?"Sürüm":"Version",`${data.format==="LAZ"?"LAZ":"LAS"} ${data.ver}`],[L?"Nokta":"Points",lasInfo.subsampled?`${lasInfo.pointCount.toLocaleString()} / ${lasInfo.originalCount.toLocaleString()}`:lasInfo.originalCount.toLocaleString()],[L?"Nokta yoğunluğu":"Point density",`${lasInfo.densityPerM2.toFixed(1)} pts/m²`],[L?"Kapsam":"Extent",`${lasInfo.widthM.toFixed(0)} × ${lasInfo.heightM.toFixed(0)} m`],[L?"Alan (bbox)":"Area (bbox)",`${lasInfo.areaHa.toFixed(2)} ha`],[L?"Yükseklik":"Elevation",`${lasInfo.minElev.toFixed(1)}→${lasInfo.maxElev.toFixed(1)} m`],["RGB",lasInfo.hasRGB?(L?"var":"yes"):(L?"yok":"no")],["EPSG",lasInfo.epsg?`${lasInfo.epsg}${lasInfo.epsgName?" · "+lasInfo.epsgName:""}`:(L?"okunmuyor":"not read")]].map(([k,v])=>
+<div key={k} style={{display:"flex",justifyContent:"space-between"}}><span>{k}</span><span style={{color:tx}}>{v}</span></div>)}
+{lasInfo.classes.length>0&&<><div style={{marginTop:4,color:txD}}>{L?"Sınıf dağılımı (ASPRS)":"Class distribution (ASPRS)"}{lasInfo.subsampled?(L?" · örneklem":" · sample"):""}</div>
+{lasInfo.classes.map(c=>{const col=clsCol(c.code).map(v=>Math.round(v*255));return(<div key={c.code} style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:7,height:7,borderRadius:2,background:`rgb(${col.join(",")})`,display:"inline-block"}}/>{c.code} · {c.label}</span><span style={{color:tx}}>{c.pct.toFixed(1)}%</span></div>);})}</>}
+</div></Sc>}
 <Sc t={L?"Dışa Aktar":"Export"}><button style={{...BT(true),width:"100%"}} onClick={hImg}>🖼 {L?"Görüntü Kaydet":"Save Image"}</button></Sc></>)}
 
 {tab==="clip"&&view==="3d"&&<Sc t="Clip"><div style={{fontSize:10,color:og,padding:8,background:og+"11",borderRadius:4}}>⚠ 2D</div></Sc>}
@@ -572,18 +628,27 @@ return(
 {segs&&<div style={{color:gn2,fontSize:10,marginTop:4}}>{met?`${met.length} ${L?"ağaç ölçüldü":"trees measured"} (${segs.count} ${L?"segment":"segments"})`:`${segs.count} ${L?"segment":"segments"}`}</div>}
 </Sc>)}
 
-{tab==="metrics"&&(<Sc t={L?"Ağaç Metrikleri":"Tree Metrics"}>{!met?<div style={{fontSize:10,color:txD}}>{L?"Segmentasyon yapın":"Run seg"}</div>:(
-<div style={{overflowX:"auto"}}><button style={{...BT(true),marginBottom:6,fontSize:9}} onClick={hCSV}>📥 CSV</button>
-<table style={{width:"100%",borderCollapse:"collapse",fontSize:8}}><thead><tr>{["#","H","CD","X","Y","DBH₁","DBH₂","H₂","CD₂","N"].map(h=><th key={h} style={{textAlign:"left",padding:"2px",borderBottom:`1px solid ${bd}`,color:txD,fontWeight:500}}>{h}</th>)}</tr></thead>
+{tab==="metrics"&&(<Sc t={L?"Ağaç Metrikleri":"Tree Metrics"}>{!met?<div style={{fontSize:10,color:txD}}>{L?"Segmentasyon yapın":"Run seg"}</div>:(<>
+<div style={{display:"flex",gap:4,marginBottom:4}}><select style={{...IN,flex:1,width:"auto",minWidth:0}} value={sp} onChange={e=>setSp(e.target.value)}>{SP.map(s=><option key={s.id} value={s.id}>{spName(s,L)}</option>)}</select><button style={BT(true)} onClick={hSp}>{L?"Uygula":"Apply"}</button></div>
+{(()=>{const apId=met.find(m=>m.speciesId)?.speciesId,ap=SP.find(s=>s.id===apId),oor=ap?met.filter(m=>!Number.isFinite(m.dbhModel)).length:0;return(<>
+{ap&&<div style={{fontSize:9,color:txM,marginBottom:4}}>{L?"Uygulanan tür: ":"Applied species: "}<span style={{color:gn2}}>{spName(ap,L)}</span>{ap.id!==sp&&<span style={{color:og}}>{L?" · seçim değişti, Uygula'ya basın":" · selection changed, press Apply"}</span>}</div>}
+<div style={{fontSize:8,color:txM,marginBottom:6,padding:6,background:ac+"11",border:`1px solid ${ac}33`,borderRadius:4,lineHeight:1.4}}>{L?"H, CD ve DBH₁: FORA'nın otomatik tahminleri. H₂, CD₂ ve DBH₂: sahada ölçtüğünüz değerler (isteğe bağlı), İstat sekmesinde karşılaştırılır.":"H, CD and DBH₁: FORA's automatic estimates. H₂, CD₂ and DBH₂: your field measurements (optional), compared in the Stats tab."}</div>
+{!ap&&<div style={{fontSize:9,color:og,marginBottom:6,padding:"4px 6px",background:og+"11",borderRadius:4,lineHeight:1.4}}>{L?"DBH₁ boş: yukarıdan tür seçip Uygula'ya basın.":"DBH₁ is empty: pick a species above and press Apply."}</div>}
+{oor>0&&<div style={{fontSize:9,color:og,marginBottom:6,padding:"4px 6px",background:og+"11",borderRadius:4,lineHeight:1.4}}>{L?`${oor} ağacın boyu bu türün modelinin geçerli aralığı dışında; DBH₁ (ve biyokütle) hesaplanamadı (–).`:`${oor} trees are outside this species model's height range; DBH₁ (and biomass) not computed (–).`}</div>}
+{met.length>200&&<div style={{fontSize:8,color:txD,marginBottom:4}}>{L?`İlk 200 ağaç gösteriliyor; CSV'de ${met.length} ağacın tümü var.`:`Showing the first 200 trees; the CSV has all ${met.length}.`}</div>}
+</>);})()}
+<div style={{overflowX:"auto"}}><button style={{...BT(true),marginBottom:6,fontSize:9}} onClick={hCSV}>📥 CSV</button> <button style={{...BT(true),marginBottom:6,fontSize:9}} onClick={hPDF} title={L?"Envanter raporu (İngilizce). Alan hesaplandıysa alan ve ağaç yoğunluğu, Kızılçam uygulandıysa karbon sayfası eklenir.":"Inventory report. Includes area and stem density if Area was calculated, and a carbon page if Calabrian pine was applied."}>📄 PDF</button>
+<table style={{width:"100%",borderCollapse:"collapse",fontSize:8}}><thead><tr>{[["#",L?"Ağaç no":"Tree ID"],["H",L?"Otomatik boy (m)":"Auto height (m)"],["CD",L?"Otomatik taç çapı (m)":"Auto crown diameter (m)"],["X",L?"Taç merkezi X (dosya koordinatı)":"Crown centre X (file CRS)"],["Y",L?"Taç merkezi Y (dosya koordinatı)":"Crown centre Y (file CRS)"],["DBH₁",L?"Model DBH tahmini (cm), tür seçip Uygula'ya basınca dolar":"Modelled DBH (cm), fills after you pick a species and press Apply"],["DBH₂",L?"Sahada ölçülen DBH (cm), elle girilir":"Field-measured DBH (cm), entered by hand"],["H₂",L?"Sahada ölçülen boy (m), elle girilir":"Field-measured height (m), entered by hand"],["CD₂",L?"Sahada ölçülen taç çapı (m), elle girilir":"Field-measured crown diameter (m), entered by hand"],["N",L?"Ağaca ait nokta sayısı":"Points in the tree"]].map(([h,t])=><th key={h} title={t} style={{textAlign:"left",padding:"2px",borderBottom:`1px solid ${bd}`,color:txD,fontWeight:500,cursor:"help"}}>{h}</th>)}</tr></thead>
 <tbody>{met.slice(0,200).map((m,i)=>(<tr key={m.id} style={{background:sel===m.id?ac+"15":i%2===0?"transparent":bd+"22",cursor:"pointer"}} onClick={()=>{setSel(sel===m.id?null:m.id);setCMode("segment");}}>
 <td style={{padding:"2px",color:CL[(m.id-1)%CL.length],fontWeight:700}}>{m.id}</td><td style={{padding:"2px"}}>{m.h.toFixed(1)}</td><td style={{padding:"2px"}}>{m.cd.toFixed(1)}</td>
-<td style={{padding:"2px",fontSize:7}}>{m.cx.toFixed(1)}</td><td style={{padding:"2px",fontSize:7}}>{m.cy.toFixed(1)}</td><td style={{padding:"2px",color:gn2}}>{m.dbhModel?.toFixed(1)||"–"}</td>
+<td style={{padding:"2px",fontSize:7}}>{m.cx.toFixed(1)}</td><td style={{padding:"2px",fontSize:7}}>{m.cy.toFixed(1)}</td><td style={{padding:"2px",color:gn2}} title={m.speciesId&&!Number.isFinite(m.dbhModel)?(L?"Model aralığı dışında":"Outside model range"):undefined}>{Number.isFinite(m.dbhModel)?m.dbhModel.toFixed(1):"–"}</td>
 <td style={{padding:"1px"}}><input value={m.dbhManual} onChange={e=>uMet(m.id,"dbhManual",e.target.value)} style={{...IN,width:26,padding:"1px 2px"}}/></td>
 <td style={{padding:"1px"}}><input value={m.hManual} onChange={e=>uMet(m.id,"hManual",e.target.value)} style={{...IN,width:26,padding:"1px 2px"}}/></td>
 <td style={{padding:"1px"}}><input value={m.cdManual} onChange={e=>uMet(m.id,"cdManual",e.target.value)} style={{...IN,width:26,padding:"1px 2px"}}/></td>
-<td style={{padding:"2px"}}>{m.cnt}</td></tr>))}</tbody></table></div>)}</Sc>)}
+<td style={{padding:"2px"}}>{m.cnt}</td></tr>))}</tbody></table></div></>)}</Sc>)}
 
 {tab==="area"&&(<Sc t={L?"Alan Bazlı":"Area-Based"}>
+<div style={{fontSize:8,color:txM,marginBottom:6,padding:6,background:ac+"11",border:`1px solid ${ac}33`,borderRadius:4,lineHeight:1.4}}>{L?"Persentil ve yoğunluk metrikleri doğrudan noktalardan gelir, ağaçlardan bağımsızdır. ITC bölümü (ağaç sayısı, N/ha) için önce Seg çalıştırın. Seg yeniden çalışınca buradaki sonuçlar silinir; tekrar Hesapla'ya basın.":"Percentile and density metrics come straight from the points, independent of trees. The ITC part (tree count, N/ha) needs Seg first. Re-running Seg clears these results; press Calculate again."}</div>
 <button style={{...BT(true),width:"100%",marginBottom:4}} onClick={hArea}>📊 {L?"Hesapla":"Calculate"}</button>
 {areaMet&&<button style={{...BT(true),width:"100%",marginBottom:8,fontSize:9}} onClick={hAreaCSV}>📥 {L?"Alan CSV":"Area CSV"}</button>}
 {areaErr&&<div style={{fontSize:9,color:og,marginBottom:6,padding:4,background:og+"11",borderRadius:4}}>⚠ {areaErr}</div>}
@@ -596,7 +661,7 @@ return(
 <div style={{fontSize:10,fontWeight:600,color:ac,marginTop:8,marginBottom:4}}>{L?"Yoğunluk":"Density"}</div>
 {[["D1",areaMet.d1],["D3",areaMet.d3],["D5",areaMet.d5],["D7",areaMet.d7],["D9",areaMet.d9],["CC₁.₃",areaMet.cc13]].map(([k,v])=><div key={k} style={{display:"flex",justifyContent:"space-between"}}><span>{k}</span><span style={{color:tx}}>{(v*100).toFixed(1)}%</span></div>)}
 <div style={{fontSize:10,fontWeight:600,color:ac,marginTop:8,marginBottom:4}}>ITC</div>
-{[[L?"Ağaç":"Trees",areaMet.itc_n],["Max",areaMet.itc_max.toFixed(1)+" m"],["Min",areaMet.itc_min.toFixed(1)+" m"],["Mean",areaMet.itc_mean.toFixed(1)+" m"],["N/ha",areaMet.density.toFixed(0)]].map(([k,v])=><div key={k} style={{display:"flex",justifyContent:"space-between"}}><span>{k}</span><span style={{color:tx}}>{v}</span></div>)}
+{areaMet.itc_n===0?<div style={{fontSize:9,color:txD}}>{L?"Segmentasyon yapılmadı":"No segmentation yet"}</div>:[[L?"Ağaç":"Trees",areaMet.itc_n],["Max",areaMet.itc_max.toFixed(1)+" m"],["Min",areaMet.itc_min.toFixed(1)+" m"],["Mean",areaMet.itc_mean.toFixed(1)+" m"],["N/ha",areaMet.density.toFixed(0)]].map(([k,v])=><div key={k} style={{display:"flex",justifyContent:"space-between"}}><span>{k}</span><span style={{color:tx}}>{v}</span></div>)}
 </div>)}</Sc>)}
 
 {tab==="stats"&&(<Sc t={L?"İstatistik":"Statistics"}>{!met?<div style={{fontSize:10,color:txD}}>Run seg</div>:(()=>{
@@ -608,11 +673,25 @@ const SB=({l,s})=>!s?<div style={{fontSize:9,color:txD,marginBottom:6}}>{l}: min
 return(<><div style={{fontSize:9,color:txD,marginBottom:8}}>{L?"Manuel değer girin":"Enter manual values"}</div>
 <SB l="H" s={cSt(wH.map(m=>({a:+m.hManual,b:m.h})))}/><SB l="CD" s={cSt(wC.map(m=>({a:+m.cdManual,b:m.cd})))}/><SB l="DBH" s={cSt(wD.map(m=>({a:+m.dbhManual,b:m.dbhModel})))}/></>);})()}</Sc>)}
 
-{tab==="species"&&(<Sc t={L?"Tür":"Species"}><select style={{...IN,width:"100%",marginBottom:6}} value={sp} onChange={e=>setSp(e.target.value)}>{SP.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select>
+{tab==="species"&&(<><Sc t={L?"Tür":"Species"}><select style={{...IN,width:"100%",marginBottom:6}} value={sp} onChange={e=>setSp(e.target.value)}>{SP.map(s=><option key={s.id} value={s.id}>{spName(s,L)}</option>)}</select>
 <div style={{fontSize:9,color:txD,marginBottom:6,padding:"4px 6px",background:dk,borderRadius:3,borderLeft:`2px solid ${ac}`}}>📖 {SP.find(s=>s.id===sp)?.ref||""}</div>
 {SP.find(s=>s.id===sp)?.experimental&&<div style={{fontSize:9,color:og,marginBottom:6,padding:"4px 6px",background:dk,borderRadius:3,borderLeft:`2px solid ${og}`,fontWeight:600}}>⚠ {L?"BETA: Bu tür için Türkiye-kalibreli katsayılar henüz doğrulanmadı. Sonuçlar yaklaşık — dikkatli kullanın.":"BETA: Turkey-calibrated coefficients not yet verified for this species. Results are approximate — use with caution."}</div>}
 {sp.startsWith("pb")&&<div style={{fontSize:9,color:gn2,marginBottom:6,padding:"4px 6px",background:dk,borderRadius:3,borderLeft:`2px solid ${gn2}`}}>🌲 {L?"Biyokütle: Sönmez et al. 2016":"Biomass: Sönmez et al. 2016"}</div>}
-<button style={{...BT(true),width:"100%"}} onClick={hSp} disabled={!met}>{L?"Uygula":"Apply"}</button></Sc>)}
+<button style={{...BT(true),width:"100%"}} onClick={hSp} disabled={!met}>{L?"Uygula":"Apply"}</button></Sc>
+{carb&&<Sc t={L?"Karbon tahmini (IPCC)":"Carbon estimate (IPCC)"}><div style={{fontSize:9,color:txM,lineHeight:1.8}}>
+{[[L?"Biyokütlesi olan ağaç":"Trees with biomass",`${carb.treesWithBiomass} / ${met.length}`],[L?"Yer üstü biyokütle":"Above-ground biomass",`${carb.agb_t.toFixed(2)} t`],[L?"Yer altı biyokütle":"Below-ground biomass",`${carb.bgb_t.toFixed(2)} t`],[L?"Karbon stoku":"Carbon stock",`${carb.carbon_tC.toFixed(2)} t C`],[L?"CO₂ eşdeğeri":"CO₂ equivalent",`${carb.co2eq_tCO2.toFixed(2)} t CO₂e`],
+...(carb.carbonPerHa_tC!=null?[[L?"Yer üstü biyokütle / ha":"Above-ground biomass / ha",`${(carb.agb_t/(areaMet.area/10000)).toFixed(1)} t/ha`],[L?"Karbon / ha":"Carbon / ha",`${carb.carbonPerHa_tC.toFixed(2)} t C/ha`],[L?"CO₂e / ha":"CO₂e / ha",`${carb.co2PerHa_tCO2.toFixed(2)} t CO₂e/ha`]]:[])].map(([k,v])=>
+<div key={k} style={{display:"flex",justifyContent:"space-between"}}><span>{k}</span><span style={{color:tx}}>{v}</span></div>)}</div>
+{carb.carbonPerHa_tC==null&&<div style={{fontSize:8,color:txD,marginTop:2}}>{L?"Hektar başına değerler için Alan sekmesinde Hesapla'ya basın.":"For per-hectare values, press Calculate in the Area tab."}</div>}
+{carb.treesWithBiomass<met.length&&<div style={{fontSize:9,color:og,marginTop:6,padding:"4px 6px",background:og+"11",borderRadius:4,lineHeight:1.4}}>{L?`${met.length-carb.treesWithBiomass} ağacın biyokütlesi yok (modelin boy aralığı dışında). Bu ağaçlar toplamlara dahil değil; gerçek stok daha yüksek olabilir.`:`${met.length-carb.treesWithBiomass} trees have no biomass (outside the model's height range). They are not in the totals, so the true stock may be higher.`}</div>}
+<div style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center",fontSize:9,color:txM,marginTop:8}}>
+<label title={L?"Kök/gövde oranı (yer altı / yer üstü biyokütle)":"Root-to-shoot ratio (below- / above-ground biomass)"} style={{display:"flex",alignItems:"center",gap:3}}>{L?"Kök/gövde R":"Root:shoot R"}<input type="number" step="0.01" min="0" max="2" value={cOpt.r} onChange={e=>setCOpt({...cOpt,r:e.target.value})} style={{...IN,width:46,padding:"1px 3px"}}/></label>
+<label title={L?"Kuru biyokütlenin karbon oranı":"Carbon fraction of dry biomass"} style={{display:"flex",alignItems:"center",gap:3}}>{L?"Karbon oranı CF":"Carbon fraction CF"}<input type="number" step="0.01" min="0" max="1" value={cOpt.cf} onChange={e=>setCOpt({...cOpt,cf:e.target.value})} style={{...IN,width:46,padding:"1px 3px"}}/></label>
+{(cOpt.r!==String(CARBON_DEFAULTS.rootToShoot)||cOpt.cf!==String(CARBON_DEFAULTS.carbonFraction))&&<button style={{...BT(false),fontSize:8,padding:"1px 6px"}} onClick={()=>setCOpt({cf:String(CARBON_DEFAULTS.carbonFraction),r:String(CARBON_DEFAULTS.rootToShoot)})}>{L?"Varsayılana dön":"Reset"}</button>}</div>
+{(!cfOk||!rOk)&&<div style={{fontSize:8,color:og,marginTop:2}}>{L?"Geçersiz değer; varsayılan kullanılıyor.":"Invalid value; using the default."}</div>}
+<div style={{fontSize:8,color:txM,marginTop:6,padding:6,background:ac+"11",border:`1px solid ${ac}33`,borderRadius:4,lineHeight:1.4}}>{L?"Yöntem: yer altı = yer üstü × R; karbon = (yer üstü + yer altı) × CF; CO₂e = karbon × 44/12. Yer üstü biyokütle: Sönmez et al. 2016. Varsayılan katsayılar: IPCC 2006, Cilt 4. IPCC'de R, meşcerenin hektar başına yer üstü biyokütlesine göre değişir; bölgenize uygun değeri girin.":"Method: below-ground = above-ground × R; carbon = (above + below) × CF; CO₂e = carbon × 44/12. Above-ground biomass: Sönmez et al. 2016. Default coefficients: IPCC 2006, Vol. 4. In IPCC, R depends on the stand's above-ground biomass per hectare; enter the value that fits your site."}</div>
+<div style={{fontSize:8,color:og,marginTop:6,fontWeight:600}}>{L?"Tahmini değerlerdir (IPCC yöntemi); saha ölçümüyle doğrulanmamıştır.":"Estimated values (IPCC methodology); not validated with field measurements."}</div>
+</Sc>}</>)}
 
 {tab==="transect"&&(<Sc t="Transect"><div style={{fontSize:9,color:txD,marginBottom:6}}>{L?"2D'de 2 nokta tıklayın":"Click 2 points on 2D"}</div>
 <button style={{...BT(!tMode),width:"100%",marginBottom:4}} onClick={()=>{setTMode(true);setTP1(null);setTP2(null);setTData(null);}}>✏ {L?"Çiz":"Draw"}</button>

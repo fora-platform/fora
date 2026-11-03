@@ -3,16 +3,19 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)](https://reactjs.org/)
 [![Three.js](https://img.shields.io/badge/Three.js-r128-000000?logo=three.js)](https://threejs.org/)
-[![Version](https://img.shields.io/badge/version-1.8.0-brightgreen.svg)](https://github.com/fora-platform/fora/releases)
+[![Version](https://img.shields.io/badge/version-1.9.0-brightgreen.svg)](https://github.com/fora-platform/fora/releases)
 
 **FORA** is an open-source, browser-based platform for processing forest LiDAR point clouds at the individual-tree and stand levels. All computation runs entirely on the client side — no installation, no server, no programming knowledge required, and point cloud data never leaves the user's device.
 
 **Live demo:** [fora-platform.github.io/fora](https://fora-platform.github.io/fora)
 
+**User manual:** [English](docs/MANUAL.md) · [Türkçe](docs/KILAVUZ.md)
+
 ## Features
 
-- **LAS file parsing** — versions 1.2–1.4, point data record formats 0–10, with correct classification handling for the LAS 1.4 formats 6–10 (see *Notes on LAS parsing* below)
-- **Interactive 3D/2D visualization** with WebGL (Three.js), with point colouring by height, normalized height, RGB, intensity, classification, or tree segment
+- **LAS and LAZ file reading** — versions 1.2–1.4, point data record formats 0–10, with correct classification handling for the LAS 1.4 formats 6–10 (see *Notes on LAS parsing* below); LAZ is decompressed in the browser with laz-perf (WebAssembly)
+- **LAS file panel** — point count, density, extent, elevation range and class distribution of the loaded file
+- **Interactive 3D/2D visualization** with WebGL (Three.js), with point colouring by height, normalized height, RGB, intensity, classification, vegetation layer (ground / low / medium / high, adjustable thresholds), or tree segment
 - **Height normalization** — grid-based minimum-Z with gap filling, or an external DTM (GeoTIFF, ESRI ASCII grid, or XYZ ground points)
 - **Spatial clipping** — circular or rectangular regions of interest
 - **CHM-based individual tree detection** — local-maxima seeds with a fixed or variable window size (VWS), followed by height-ranked region growing
@@ -21,9 +24,10 @@
 - **Area-based metrics** — height percentiles (H5–H99), density ratios (D1–D9), canopy cover (CC₁.₃), and variability statistics
 - **Allometric DBH estimation** for 8 Turkish tree species
 - **Aboveground biomass** for *Pinus brutia* (five components)
+- **Carbon estimate** for *Pinus brutia* following IPCC 2006 (below-ground biomass, carbon, CO₂ equivalent; coefficients shown and adjustable; estimates, not field-validated)
 - **Vertical transect profile** analysis
-- **Multi-format export** (CSV, PNG)
-- **Bilingual UI** (English/Turkish), fully offline after first load
+- **Multi-format export** (CSV, PNG) and a **PDF inventory report**
+- **Bilingual UI** (English/Turkish), fully offline after first load (the LAZ and PDF components load the first time they are used)
 
 ## Quick start
 
@@ -92,7 +96,7 @@ Each archive provides ground-classified point clouds and per-site vegetation ret
 
 ## Citation
 
-If you use FORA, please cite the archived release (see [`CITATION.cff`](CITATION.cff)) and the SoftwareX article once published. The concept DOI [10.5281/zenodo.19546162](https://doi.org/10.5281/zenodo.19546162) always resolves to the latest version; each release also has its own version DOI.
+If you use FORA, please cite the SoftwareX article, [doi:10.1016/j.softx.2026.102927](https://doi.org/10.1016/j.softx.2026.102927), and the archived software release (see [`CITATION.cff`](CITATION.cff)). The concept DOI [10.5281/zenodo.19546162](https://doi.org/10.5281/zenodo.19546162) always resolves to the latest version; each release also has its own version DOI.
 
 ## License
 
