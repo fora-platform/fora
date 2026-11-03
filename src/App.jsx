@@ -5,8 +5,13 @@ import{parseLAS}from"./lasParser.js";
 import{getLasInfo}from"./lasInfo.js";
 import{standCarbon,treeCarbon,CARBON_DEFAULTS}from"./carbon.js";
 import{buildInventoryPDF}from"./inventoryReport.js";
+import{isLaz,makeLazToLas}from"./lazLoader.js";
+import lazWasmUrl from"laz-perf/lib/web/laz-perf.wasm?url";
 import{layerOf,classifyByHeight,layerSummary,VEG_THRESHOLDS,LAYER_COLOURS}from"./vegLayers.js";
 
+// LAZ: laz-perf (WebAssembly) is loaded only when a .laz is opened; Vite serves
+// the .wasm from its own assets folder, so tell the loader where it is
+const lazToLas=makeLazToLas(async()=>{const{createLazPerf}=await import("laz-perf");return createLazPerf({locateFile:p=>p.endsWith(".wasm")?lazWasmUrl:p});});
 
 // ASPRS classification colours (ground, low/med/high vegetation, building, water)
 const CLS_COL={0:[0.6,0.6,0.6],1:[0.7,0.7,0.7],2:[0.65,0.45,0.25],3:[0.55,0.75,0.35],
@@ -294,7 +299,7 @@ const[vwsMode,setVwsMode]=useState(false);const[vwsPreset,setVwsPreset]=useState
 const[vwsCustom,setVwsCustom]=useState({mode:"linear",a:2.5,b:0.05,c:0,min:2,max:5});
 const[tab,setTab]=useState("tools");const[theme,setTheme]=useState("dark");const[pan,setPan]=useState({x:0,y:0});const[zoom,setZoom]=useState(1);
 const[tMode,setTMode]=useState(false);const[tP1,setTP1]=useState(null);const[tP2,setTP2]=useState(null);const[tData,setTData]=useState(null);
-const[lasInfo,setLasInfo]=useState(null);const[segP,setSegP]=useState(null);const[vegThr,setVegThr]=useState({g:String(VEG_THRESHOLDS.groundMax),l:String(VEG_THRESHOLDS.lowMax),m:String(VEG_THRESHOLDS.mediumMax)});const[cOpt,setCOpt]=useState({cf:String(CARBON_DEFAULTS.carbonFraction),r:String(CARBON_DEFAULTS.rootToShoot)});const[showLaz,setShowLaz]=useState(true);const[showCite,setShowCite]=useState(false);const[citeCopied,setCiteCopied]=useState(false);
+const[lasInfo,setLasInfo]=useState(null);const[segP,setSegP]=useState(null);const[vegThr,setVegThr]=useState({g:String(VEG_THRESHOLDS.groundMax),l:String(VEG_THRESHOLDS.lowMax),m:String(VEG_THRESHOLDS.mediumMax)});const[cOpt,setCOpt]=useState({cf:String(CARBON_DEFAULTS.carbonFraction),r:String(CARBON_DEFAULTS.rootToShoot)});const[showLaz,setShowLaz]=useState(false);const[showCite,setShowCite]=useState(false);const[citeCopied,setCiteCopied]=useState(false);
 const topR=useRef(null),sideR=useRef(null),transR=useRef(null),threeR=useRef(null),cleanR=useRef(null);
 const dragR=useRef({on:false,moved:false,sx:0,sy:0,px:0,py:0});
 const dR=useRef(),zR=useRef(),cR=useRef(),czR=useRef(),mR=useRef();
@@ -314,9 +319,12 @@ const normRange=aZ?(()=>{let mx=0;const st=Math.max(1,Math.floor(aZ.length/2000)
 const hasTrans=tData&&tData.length>0;
 
 const handleFile=useCallback(async e=>{const f=e.target.files[0];if(!f)return;
-  if(f.name.toLowerCase().endsWith(".laz")){setMsg(L?"⚠ LAZ desteklenmiyor":"⚠ LAZ not supported");setShowLaz(true);return;}
-  setMsg("Loading...");setCC(null);setClp(null);setClpZ(null);setClpB(null);setSegs(null);setMet(null);setAreaMet(null);setAreaErr("");setSel(null);setView("2d");setZN(null);setPan({x:0,y:0});setZoom(1);setTP1(null);setTP2(null);setTData(null);cam3D.current={theta:Math.PI/4,phi:Math.PI/3.2,dist:0};
-  try{const buf=await f.arrayBuffer();const pts=parseLAS(buf);setData(pts);setLasInfo({...getLasInfo(pts),fileName:f.name});setBnd(gB(pts));setMsg(L?"Normalize...":"Normalizing...");await new Promise(r=>setTimeout(r,30));
+  setMsg("Loading...");setShowLaz(false);setCC(null);setClp(null);setClpZ(null);setClpB(null);setSegs(null);setMet(null);setAreaMet(null);setAreaErr("");setSel(null);setView("2d");setZN(null);setPan({x:0,y:0});setZoom(1);setTP1(null);setTP2(null);setTData(null);cam3D.current={theta:Math.PI/4,phi:Math.PI/3.2,dist:0};
+  try{let buf=await f.arrayBuffer();let lazN=null;
+    if(isLaz(f.name,buf)){setMsg(L?"LAZ açılıyor...":"Decompressing LAZ...");await new Promise(r=>setTimeout(r,30));
+      try{const r=await lazToLas(buf);buf=r.buffer;lazN=r.originalCount;}
+      catch(err){console.error(err);setShowLaz(true);throw new Error((L?"LAZ açılamadı: ":"Could not open LAZ: ")+err.message);}}
+    const pts=parseLAS(buf);if(lazN!=null){pts.nOrig=lazN;pts.format="LAZ";}setData(pts);setLasInfo({...getLasInfo(pts),fileName:f.name});setBnd(gB(pts));setMsg(L?"Normalize...":"Normalizing...");await new Promise(r=>setTimeout(r,30));
     if(dtmSrc==="external"&&extDTM){
       // DTM elevation sanity check
       const lasB=gB(pts);let dtmMin=1/0,dtmMax=-1/0;for(let i=0;i<extDTM.data.length;i++){const v=extDTM.data[i];if(isFinite(v)){if(v<dtmMin)dtmMin=v;if(v>dtmMax)dtmMax=v;}}
@@ -467,7 +475,7 @@ if(!data)return(
 <div style={{fontSize:22,fontWeight:800,color:ac,letterSpacing:4}}>◆ FORA</div>
 <div style={{fontSize:11,color:txD,letterSpacing:1}}>FORest Analysis Platform</div>
 <label style={{padding:"12px 36px",background:ac+"15",color:ac,border:`1px solid ${ac}44`,borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,marginTop:10}}>
-{L?"LAS Dosyası Yükle":"Load LAS File"}<input type="file" accept=".las,.laz" onChange={handleFile} style={{display:"none"}}/></label>
+{L?"LAS / LAZ Dosyası Yükle":"Load LAS / LAZ File"}<input type="file" accept=".las,.laz" onChange={handleFile} style={{display:"none"}}/></label>
 <div style={{padding:10,background:pn2,border:`1px solid ${bd}`,borderRadius:6,maxWidth:380,marginTop:4}}>
 <div style={{fontSize:10,fontWeight:700,color:txM,marginBottom:6,letterSpacing:.5}}>{L?"YER MODELİ (OPSİYONEL)":"GROUND MODEL (OPTIONAL)"}</div>
 <label style={{fontSize:10,color:tx,display:"flex",alignItems:"center",gap:4,marginBottom:3,cursor:"pointer"}}><input type="radio" name="dtmSrcL" checked={dtmSrc==="auto"} onChange={()=>setDtmSrc("auto")} style={{margin:0}}/>{L?"Otomatik (grid min-Z)":"Auto (grid min-Z)"}</label>
@@ -476,12 +484,12 @@ if(!data)return(
 </div>
 {msg&&<div style={{color:msg.startsWith("⚠")?og:msg.startsWith("✓")?gn2:ac,fontSize:11,maxWidth:400,textAlign:"center"}}>{msg}</div>}
 {showLaz&&<div style={{fontSize:9,color:txM,lineHeight:1.8,padding:8,background:dk=="#080b10"?"#111":"#eee",borderRadius:6,maxWidth:360,marginTop:4}}>
-<div style={{fontSize:10,fontWeight:700,color:og,marginBottom:6}}>LAZ → LAS</div>
+<div style={{fontSize:10,fontWeight:700,color:og,marginBottom:6}}>{L?"LAZ açılamadı. LAS'a dönüştürüp yükleyebilirsiniz:":"Could not open the LAZ. Convert it to LAS and load that:"}</div>
 <div><b>CloudCompare:</b> File→Open .laz→Save As .las</div>
 <div><b>R:</b> <code>readLAS("f.laz") |&gt; writeLAS("f.las")</code></div>
 <div><b>LAStools:</b> <code>las2las -i f.laz -o f.las</code></div>
 <div><b>PDAL:</b> <code>pdal translate f.laz f.las</code></div></div>}
-<div style={{color:txD,fontSize:9,marginTop:4}}>LAS 1.2–1.4</div>
+<div style={{color:txD,fontSize:9,marginTop:4}}>LAS / LAZ 1.2–1.4</div>
 <div style={{display:"flex",gap:8,marginTop:8}}><button style={BT(L)} onClick={()=>setLang("TR")}>TR</button><button style={BT(!L)} onClick={()=>setLang("EN")}>EN</button></div>
 {/* ATIF FOOTER */}
 <div style={{marginTop:18,paddingTop:12,borderTop:`1px solid ${bd}`,maxWidth:420,textAlign:"center"}}>
@@ -571,7 +579,7 @@ return(
 {[["Pts",`${(data.nOrig/1e6).toFixed(2)}M → ${(aP.x.length/1e3).toFixed(0)}K`],["Norm","✓ "+normRange],["Z raw",`${aB.z0.toFixed(1)}→${aB.z1.toFixed(1)}`],["X",`${aB.x0.toFixed(1)}→${aB.x1.toFixed(1)}`],["Y",`${aB.y0.toFixed(1)}→${aB.y1.toFixed(1)}`],[L?"Alan":"Area",`${((aB.x1-aB.x0)*(aB.y1-aB.y0)).toFixed(0)} m²`]].map(([k,v])=>
 <div key={k} style={{display:"flex",justifyContent:"space-between"}}><span>{k}</span><span style={{color:tx}}>{v}</span></div>)}</div></Sc>
 {lasInfo&&<Sc t={L?"LAS Dosyası":"LAS File"}><div style={{fontSize:9,color:txM,lineHeight:1.8}}>
-{[[L?"Sürüm":"Version",`LAS ${data.ver}`],[L?"Nokta":"Points",lasInfo.subsampled?`${lasInfo.pointCount.toLocaleString()} / ${lasInfo.originalCount.toLocaleString()}`:lasInfo.originalCount.toLocaleString()],[L?"Nokta yoğunluğu":"Point density",`${lasInfo.densityPerM2.toFixed(1)} pts/m²`],[L?"Kapsam":"Extent",`${lasInfo.widthM.toFixed(0)} × ${lasInfo.heightM.toFixed(0)} m`],[L?"Alan (bbox)":"Area (bbox)",`${lasInfo.areaHa.toFixed(2)} ha`],[L?"Yükseklik":"Elevation",`${lasInfo.minElev.toFixed(1)}→${lasInfo.maxElev.toFixed(1)} m`],["RGB",lasInfo.hasRGB?(L?"var":"yes"):(L?"yok":"no")],["EPSG",lasInfo.epsg?`${lasInfo.epsg}${lasInfo.epsgName?" · "+lasInfo.epsgName:""}`:(L?"okunmuyor":"not read")]].map(([k,v])=>
+{[[L?"Sürüm":"Version",`${data.format==="LAZ"?"LAZ":"LAS"} ${data.ver}`],[L?"Nokta":"Points",lasInfo.subsampled?`${lasInfo.pointCount.toLocaleString()} / ${lasInfo.originalCount.toLocaleString()}`:lasInfo.originalCount.toLocaleString()],[L?"Nokta yoğunluğu":"Point density",`${lasInfo.densityPerM2.toFixed(1)} pts/m²`],[L?"Kapsam":"Extent",`${lasInfo.widthM.toFixed(0)} × ${lasInfo.heightM.toFixed(0)} m`],[L?"Alan (bbox)":"Area (bbox)",`${lasInfo.areaHa.toFixed(2)} ha`],[L?"Yükseklik":"Elevation",`${lasInfo.minElev.toFixed(1)}→${lasInfo.maxElev.toFixed(1)} m`],["RGB",lasInfo.hasRGB?(L?"var":"yes"):(L?"yok":"no")],["EPSG",lasInfo.epsg?`${lasInfo.epsg}${lasInfo.epsgName?" · "+lasInfo.epsgName:""}`:(L?"okunmuyor":"not read")]].map(([k,v])=>
 <div key={k} style={{display:"flex",justifyContent:"space-between"}}><span>{k}</span><span style={{color:tx}}>{v}</span></div>)}
 {lasInfo.classes.length>0&&<><div style={{marginTop:4,color:txD}}>{L?"Sınıf dağılımı (ASPRS)":"Class distribution (ASPRS)"}{lasInfo.subsampled?(L?" · örneklem":" · sample"):""}</div>
 {lasInfo.classes.map(c=>{const col=clsCol(c.code).map(v=>Math.round(v*255));return(<div key={c.code} style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:7,height:7,borderRadius:2,background:`rgb(${col.join(",")})`,display:"inline-block"}}/>{c.code} · {c.label}</span><span style={{color:tx}}>{c.pct.toFixed(1)}%</span></div>);})}</>}
