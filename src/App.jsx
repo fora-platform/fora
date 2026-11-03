@@ -2,6 +2,7 @@ import{useState,useRef,useEffect,useCallback}from"react";
 import*as THREE from"three";
 
 import{parseLAS}from"./lasParser.js";
+import{getLasInfo}from"./lasInfo.js";
 
 
 // ASPRS classification colours (ground, low/med/high vegetation, building, water)
@@ -194,24 +195,24 @@ else{const a=v00*(1-dx)+v10*dx,b=v01*(1-dx)+v11*dx,g=a*(1-dy)+b*dy;out[i]=pts.z[
 // Inverse-solving used for pure h-d models (Gompertz, Schnute, Prodan)
 const SP=[
   // Gencal (2025) PhD thesis + Karahalil & Karsli (2017,)
-  {id:"ps",name:"Sarıçam (P. sylvestris)",ref:"Gencal 2025",fn:(h,cd)=>Math.max(0,-5.22+1.65*h+2.35*cd)},
-  {id:"ab",name:"Göknar (A. bornmuelleriana)",ref:"Gencal 2025",fn:(h,cd)=>Math.max(0,-6.27+1.80*h+2.06*cd)},
+  {id:"ps",nameTR:"Sarıçam (P. sylvestris)",nameEN:"Scots pine (P. sylvestris)",ref:"Gencal 2025",fn:(h,cd)=>Math.max(0,-5.22+1.65*h+2.35*cd)},
+  {id:"ab",nameTR:"Göknar (A. bornmuelleriana)",nameEN:"Uludağ fir (A. bornmuelleriana)",ref:"Gencal 2025",fn:(h,cd)=>Math.max(0,-6.27+1.80*h+2.06*cd)},
   // Özçelik et al. (2014) DOI:10.3906/TAR-1304-115 — Gompertz, inverse-solved for d
   // Formula: h = 1.3 + a·exp(-b·exp(-c·d))  →  d = -ln(-ln((h-1.3)/a)/b)/c
-  {id:"pb_me",name:"Kızılçam-Sahil (P. brutia ME)",ref:"Özçelik 2014",fn:(h,cd)=>{const a=22.527,b=1.823,c=0.062;if(h<=1.3||h>=a+1.3)return NaN;const inner=(h-1.3)/a;if(inner<=0||inner>=1)return NaN;const lni=-Math.log(inner)/b;if(lni<=0)return NaN;return Math.max(0,-Math.log(lni)/c);}},
-  {id:"pb_ie",name:"Kızılçam-İç (P. brutia IE)",ref:"Özçelik 2014",fn:(h,cd)=>{const a=25.911,b=2.004,c=0.045;if(h<=1.3||h>=a+1.3)return NaN;const inner=(h-1.3)/a;if(inner<=0||inner>=1)return NaN;const lni=-Math.log(inner)/b;if(lni<=0)return NaN;return Math.max(0,-Math.log(lni)/c);}},
-  {id:"pb_le",name:"Kızılçam-Göl (P. brutia LE)",ref:"Özçelik 2014",fn:(h,cd)=>{const a=24.207,b=1.465,c=0.038;if(h<=1.3||h>=a+1.3)return NaN;const inner=(h-1.3)/a;if(inner<=0||inner>=1)return NaN;const lni=-Math.log(inner)/b;if(lni<=0)return NaN;return Math.max(0,-Math.log(lni)/c);}},
+  {id:"pb_me",nameTR:"Kızılçam-Sahil (P. brutia ME)",nameEN:"Calabrian pine – coastal (P. brutia ME)",ref:"Özçelik 2014",fn:(h,cd)=>{const a=22.527,b=1.823,c=0.062;if(h<=1.3||h>=a+1.3)return NaN;const inner=(h-1.3)/a;if(inner<=0||inner>=1)return NaN;const lni=-Math.log(inner)/b;if(lni<=0)return NaN;return Math.max(0,-Math.log(lni)/c);}},
+  {id:"pb_ie",nameTR:"Kızılçam-İç (P. brutia IE)",nameEN:"Calabrian pine – inland (P. brutia IE)",ref:"Özçelik 2014",fn:(h,cd)=>{const a=25.911,b=2.004,c=0.045;if(h<=1.3||h>=a+1.3)return NaN;const inner=(h-1.3)/a;if(inner<=0||inner>=1)return NaN;const lni=-Math.log(inner)/b;if(lni<=0)return NaN;return Math.max(0,-Math.log(lni)/c);}},
+  {id:"pb_le",nameTR:"Kızılçam-Göl (P. brutia LE)",nameEN:"Calabrian pine – lake district (P. brutia LE)",ref:"Özçelik 2014",fn:(h,cd)=>{const a=24.207,b=1.465,c=0.038;if(h<=1.3||h>=a+1.3)return NaN;const inner=(h-1.3)/a;if(inner<=0||inner>=1)return NaN;const lni=-Math.log(inner)/b;if(lni<=0)return NaN;return Math.max(0,-Math.log(lni)/c);}},
   // Özçelik et al. (2014) — Pinus nigra Gompertz (Akdeniz sahil)
-  {id:"pn",name:"Karaçam (P. nigra)",ref:"Özçelik 2014",fn:(h,cd)=>{const a=23.494,b=2.397,c=0.067;if(h<=1.3||h>=a+1.3)return NaN;const inner=(h-1.3)/a;if(inner<=0||inner>=1)return NaN;const lni=-Math.log(inner)/b;if(lni<=0)return NaN;return Math.max(0,-Math.log(lni)/c);}},
+  {id:"pn",nameTR:"Karaçam (P. nigra)",nameEN:"Black pine (P. nigra)",ref:"Özçelik 2014",fn:(h,cd)=>{const a=23.494,b=2.397,c=0.067;if(h<=1.3||h>=a+1.3)return NaN;const inner=(h-1.3)/a;if(inner<=0||inner>=1)return NaN;const lni=-Math.log(inner)/b;if(lni<=0)return NaN;return Math.max(0,-Math.log(lni)/c);}},
   // Ercanli (2015) DOI:10.5154/R.RCHSCFA.2015.02.006 — Schnute, Kestel-Bursa
   // Assumes H_dom = max(H+1, 10) m and D_dom = 35 cm; inverse-solved numerically
-  {id:"fo",name:"Kayın (F. orientalis)",ref:"Ercanli 2015 (Kestel-Bursa)",fn:(h,cd)=>{const a=1.659,b=0.051,H0=Math.max(h+1,10),D0=35;let lo=0.1,hi=150;for(let i=0;i<40;i++){const d=(lo+hi)/2;const num=1-Math.exp(-b*d),den=1-Math.exp(-b*D0);const hPred=Math.pow(Math.pow(1.3,a)+(Math.pow(H0,a)-Math.pow(1.3,a))*num/den,1/a);if(hPred<h)lo=d;else hi=d;}return Math.max(0,(lo+hi)/2);}},
+  {id:"fo",nameTR:"Kayın (F. orientalis)",nameEN:"Oriental beech (F. orientalis)",ref:"Ercanli 2015 (Kestel-Bursa)",fn:(h,cd)=>{const a=1.659,b=0.051,H0=Math.max(h+1,10),D0=35;let lo=0.1,hi=150;for(let i=0;i<40;i++){const d=(lo+hi)/2;const num=1-Math.exp(-b*d),den=1-Math.exp(-b*D0);const hPred=Math.pow(Math.pow(1.3,a)+(Math.pow(H0,a)-Math.pow(1.3,a))*num/den,1/a);if(hPred<h)lo=d;else hi=d;}return Math.max(0,(lo+hi)/2);}},
   // Carus & Akguş (2018) DOI:10.18182/tjf.338311 — Prodan 1968 rational (m8)
   // h = 1.30 + d² / (a + b·d + c·d²)
   // Tarsus region afforestation stands, n=5885 trees, Çizelge 4 (model dev dataset)
   // Verified: d=25.7 → h=8.54 (paper mean 8.4) — PHYSICALLY VALID
   // Inverse solved numerically via bisection on h
-  {id:"pp",name:"Fıstıkçamı (P. pinea)",ref:"Carus & Akguş 2018 (Tarsus)",fn:(h,cd)=>{
+  {id:"pp",nameTR:"Fıstıkçamı (P. pinea)",nameEN:"Stone pine (P. pinea)",ref:"Carus & Akguş 2018 (Tarsus)",fn:(h,cd)=>{
     if(h<=1.3)return NaN;
     const a=-8.922602,b=3.254666,c=0.025050;
     // Find d such that 1.30 + d²/(a + b·d + c·d²) = h
@@ -229,7 +230,7 @@ const SP=[
   // h = Hdom · [(1-exp(b1·d))^b2 / (1-exp(b1·Ddom))^b2]
   // b1=-0.046, b2=0.650; defaults Hdom=25m, Ddom=40cm for mature Mediterranean stand
   // Proxy for Turkish Q. cerris (published Turkish coefs not yet available)
-  {id:"qc",name:"Meşe (Q. cerris) [BETA]",ref:"Cimini & Salvati 2011 (proxy)",experimental:true,fn:(h,cd)=>{
+  {id:"qc",nameTR:"Meşe (Q. cerris) [BETA]",nameEN:"Turkey oak (Q. cerris) [BETA]",ref:"Cimini & Salvati 2011 (proxy)",experimental:true,fn:(h,cd)=>{
     if(h<=1.3)return NaN;
     const b1=-0.046,b2=0.650,Hdom=25,Ddom=40;
     const den=Math.pow(1-Math.exp(b1*Ddom),b2);
@@ -261,6 +262,8 @@ const BIOMASS={
 const CL=["#e6194b","#3cb44b","#ffe119","#4363d8","#f58231","#911eb4","#42d4f4","#f032e6","#bfef45","#fabed4","#469990","#dcbeff","#9A6324","#800000","#aaffc3","#808000"];
 function hC(t){return[t<.5?0:(t-.5)*2,t<.5?t*2:(1-t)*2,t<.5?(.5-t)*2:0];}
 function nS(r){if(r<=0)return 1;const raw=r/6,mg=10**Math.floor(Math.log10(raw)),n=raw/mg;return(n<1.5?1:n<3.5?2:n<7.5?5:10)*mg;}
+// species display name in the current UI language
+const spName=(s,L)=>s?(L?s.nameTR:s.nameEN):"";
 function dlF(blob,name){const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(url),1000);}
 
 // --- citation ---
@@ -288,7 +291,7 @@ const[vwsMode,setVwsMode]=useState(false);const[vwsPreset,setVwsPreset]=useState
 const[vwsCustom,setVwsCustom]=useState({mode:"linear",a:2.5,b:0.05,c:0,min:2,max:5});
 const[tab,setTab]=useState("tools");const[theme,setTheme]=useState("dark");const[pan,setPan]=useState({x:0,y:0});const[zoom,setZoom]=useState(1);
 const[tMode,setTMode]=useState(false);const[tP1,setTP1]=useState(null);const[tP2,setTP2]=useState(null);const[tData,setTData]=useState(null);
-const[showLaz,setShowLaz]=useState(true);const[showCite,setShowCite]=useState(false);const[citeCopied,setCiteCopied]=useState(false);
+const[lasInfo,setLasInfo]=useState(null);const[showLaz,setShowLaz]=useState(true);const[showCite,setShowCite]=useState(false);const[citeCopied,setCiteCopied]=useState(false);
 const topR=useRef(null),sideR=useRef(null),transR=useRef(null),threeR=useRef(null),cleanR=useRef(null);
 const dragR=useRef({on:false,moved:false,sx:0,sy:0,px:0,py:0});
 const dR=useRef(),zR=useRef(),cR=useRef(),czR=useRef(),mR=useRef();
@@ -305,7 +308,7 @@ const hasTrans=tData&&tData.length>0;
 const handleFile=useCallback(async e=>{const f=e.target.files[0];if(!f)return;
   if(f.name.toLowerCase().endsWith(".laz")){setMsg(L?"⚠ LAZ desteklenmiyor":"⚠ LAZ not supported");setShowLaz(true);return;}
   setMsg("Loading...");setCC(null);setClp(null);setClpZ(null);setClpB(null);setSegs(null);setMet(null);setAreaMet(null);setAreaErr("");setSel(null);setView("2d");setZN(null);setPan({x:0,y:0});setZoom(1);setTP1(null);setTP2(null);setTData(null);cam3D.current={theta:Math.PI/4,phi:Math.PI/3.2,dist:0};
-  try{const buf=await f.arrayBuffer();const pts=parseLAS(buf);setData(pts);setBnd(gB(pts));setMsg(L?"Normalize...":"Normalizing...");await new Promise(r=>setTimeout(r,30));
+  try{const buf=await f.arrayBuffer();const pts=parseLAS(buf);setData(pts);setLasInfo(getLasInfo(pts));setBnd(gB(pts));setMsg(L?"Normalize...":"Normalizing...");await new Promise(r=>setTimeout(r,30));
     if(dtmSrc==="external"&&extDTM){
       // DTM elevation sanity check
       const lasB=gB(pts);let dtmMin=1/0,dtmMax=-1/0;for(let i=0;i<extDTM.data.length;i++){const v=extDTM.data[i];if(isFinite(v)){if(v<dtmMin)dtmMin=v;if(v>dtmMax)dtmMax=v;}}
@@ -327,13 +330,13 @@ const handleDTM=useCallback(async e=>{const f=e.target.files[0];if(!f)return;set
     setExtDTM(dtm);setDtmSrc("external");setMsg(L?`✓ DTM yüklendi (${dtm.w}×${dtm.h} hücre)`:`✓ DTM loaded (${dtm.w}×${dtm.h} cells)`);
   }catch(err){setMsg("⚠ DTM: "+err.message);}},[L]);
 const hClip=useCallback(()=>{if(!data||!cc||!zN)return;const{pts:cp,zN:cz}=clipP(data,zN,cc.x,cc.y,cr,cs);if(!cp.x.length){setMsg("No points!");return;}setClp(cp);setClpZ(cz);setClpB(gB(cp));setSegs(null);setMet(null);setAreaMet(null);setAreaErr("");setPan({x:0,y:0});setZoom(1);},[data,zN,cc,cr,cs]);
-const hSeg=useCallback(()=>{const pts=cR.current||dR.current,za=czR.current||zR.current;if(!pts||!za)return;setMsg(L?"Segmentasyon...":"Segmenting...");setTimeout(()=>{const cCoef=vwsPreset==="custom"?customVWS(vwsCustom):null;const s=runSeg(pts,za,sCell,sMinH,sSR,vwsMode,vwsPreset,cCoef);setSegs(s);setCMode("segment");setMet(makeMet(pts,za,s.labels,s.count,crownMode));setMsg("");setTab("metrics");},50);},[sCell,sMinH,sSR,vwsMode,vwsPreset,vwsCustom,crownMode,L]);
+const hSeg=useCallback(()=>{const pts=cR.current||dR.current,za=czR.current||zR.current;if(!pts||!za)return;setMsg(L?"Segmentasyon...":"Segmenting...");setTimeout(()=>{const cCoef=vwsPreset==="custom"?customVWS(vwsCustom):null;const s=runSeg(pts,za,sCell,sMinH,sSR,vwsMode,vwsPreset,cCoef);setSegs(s);setCMode("segment");setMet(makeMet(pts,za,s.labels,s.count,crownMode));setAreaMet(null);setAreaErr("");setMsg("");setTab("metrics");},50);},[sCell,sMinH,sSR,vwsMode,vwsPreset,vwsCustom,crownMode,L]);
 const hArea=useCallback(()=>{const pts=cR.current||dR.current,za=czR.current||zR.current,m=mR.current;
 // pass ROI geometry so density uses the true area, not the bounding box
 const roi=(clp&&cc)?{shape:cs,r:cr}:null;
 const r=makeArea(pts,za,m,roi);if(typeof r==="string"){setAreaErr(r);setAreaMet(null);}else{setAreaMet(r);setAreaErr("");}setMsg("");},[clp,cc,cs,cr]);
-const hSp=useCallback(()=>{if(!met)return;const s=SP.find(x=>x.id===sp);const bioKey=sp.startsWith("pb")?"pb":null;const bio=bioKey?BIOMASS[bioKey]:null;setMet(prev=>prev.map(m=>{const d=s?s.fn(m.h,m.cd):null;const bioOut=(bio&&d&&d>0&&m.h>0)?{bm_total:bio.total(d,m.h),bm_stem:bio.stem(d,m.h),bm_branch:bio.branches(d,m.h),bm_bark:bio.bark(d,m.h),bm_needle:bio.needles(d,m.h)}:{};return{...m,dbhModel:d,species:s?.name,...bioOut};}));},[met,sp]);
-const hCSV=useCallback(()=>{if(!met)return;let csv="ID,H_auto,CD_auto,CPA,CD_bbox,CD_convex,CD_concave,CPA_bbox,CPA_convex,CPA_concave,CrownMethod,CenterX,CenterY,DBH_model,H_manual,CD_manual,DBH_manual,Species,Biomass_total_kg,Biomass_stem_kg,Biomass_branch_kg,Biomass_bark_kg,Biomass_needle_kg,Points\n";csv+=met.map(m=>`${m.id},${m.h.toFixed(2)},${m.cd.toFixed(2)},${m.cpa.toFixed(2)},${m.cdBbox?.toFixed(2)||""},${m.cdConvex?.toFixed(2)||""},${m.cdConcave?.toFixed(2)||""},${m.cpaBbox?.toFixed(2)||""},${m.cpaConvex?.toFixed(2)||""},${m.cpaConcave?.toFixed(2)||""},${m.crownMethod||""},${m.cx.toFixed(2)},${m.cy.toFixed(2)},${m.dbhModel?.toFixed(1)||""},${m.hManual||""},${m.cdManual||""},${m.dbhManual||""},${m.species||""},${m.bm_total?.toFixed(2)||""},${m.bm_stem?.toFixed(2)||""},${m.bm_branch?.toFixed(2)||""},${m.bm_bark?.toFixed(2)||""},${m.bm_needle?.toFixed(2)||""},${m.cnt}`).join("\n");if(areaMet)csv+="\n\nAREA_METRICS\n"+Object.entries(areaMet).map(([k,v])=>`${k},${typeof v==="number"?v.toFixed(3):v}`).join("\n");dlF(new Blob(["\uFEFF"+csv],{type:"text/csv"}),"fora_tree_metrics.csv");},[met,areaMet]);
+const hSp=useCallback(()=>{if(!met)return;const s=SP.find(x=>x.id===sp);const bioKey=sp.startsWith("pb")?"pb":null;const bio=bioKey?BIOMASS[bioKey]:null;setMet(prev=>prev.map(m=>{const d=s?s.fn(m.h,m.cd):null;const bioOut=(bio&&d&&d>0&&m.h>0)?{bm_total:bio.total(d,m.h),bm_stem:bio.stem(d,m.h),bm_branch:bio.branches(d,m.h),bm_bark:bio.bark(d,m.h),bm_needle:bio.needles(d,m.h)}:{};return{...m,dbhModel:d,species:s?.nameEN,speciesId:s?.id,...bioOut};}));},[met,sp]);
+const hCSV=useCallback(()=>{if(!met)return;let csv="ID,H_auto,CD_auto,CPA,CD_bbox,CD_convex,CD_concave,CPA_bbox,CPA_convex,CPA_concave,CrownMethod,CenterX,CenterY,DBH_model,H_manual,CD_manual,DBH_manual,Species,Biomass_total_kg,Biomass_stem_kg,Biomass_branch_kg,Biomass_bark_kg,Biomass_needle_kg,Points\n";csv+=met.map(m=>`${m.id},${m.h.toFixed(2)},${m.cd.toFixed(2)},${m.cpa.toFixed(2)},${m.cdBbox?.toFixed(2)||""},${m.cdConvex?.toFixed(2)||""},${m.cdConcave?.toFixed(2)||""},${m.cpaBbox?.toFixed(2)||""},${m.cpaConvex?.toFixed(2)||""},${m.cpaConcave?.toFixed(2)||""},${m.crownMethod||""},${m.cx.toFixed(2)},${m.cy.toFixed(2)},${Number.isFinite(m.dbhModel)?m.dbhModel.toFixed(1):""},${m.hManual||""},${m.cdManual||""},${m.dbhManual||""},${m.species||""},${m.bm_total?.toFixed(2)||""},${m.bm_stem?.toFixed(2)||""},${m.bm_branch?.toFixed(2)||""},${m.bm_bark?.toFixed(2)||""},${m.bm_needle?.toFixed(2)||""},${m.cnt}`).join("\n");if(areaMet)csv+="\n\nAREA_METRICS\n"+Object.entries(areaMet).map(([k,v])=>`${k},${typeof v==="number"?v.toFixed(3):v}`).join("\n");dlF(new Blob(["\uFEFF"+csv],{type:"text/csv"}),"fora_tree_metrics.csv");},[met,areaMet]);
 const hAreaCSV=useCallback(()=>{if(!areaMet)return;let csv="Metric,Value\n";Object.entries(areaMet).forEach(([k,v])=>{csv+=`${k},${typeof v==="number"?v.toFixed(4):v}\n`;});dlF(new Blob(["\uFEFF"+csv],{type:"text/csv"}),"fora_area_metrics.csv");},[areaMet]);
 const hImg=useCallback(()=>{if(view==="3d"){const el=threeR.current;if(!el)return;const wc=el.querySelector("canvas");if(!wc)return;try{const url=wc.toDataURL("image/png");const a=document.createElement("a");a.href=url;a.download="fora_3d.png";document.body.appendChild(a);a.click();document.body.removeChild(a);}catch(err){setMsg("Export failed");}
 }else{const cv=topR.current;if(!cv)return;const W=cv.width,H=cv.height;const tmp=document.createElement("canvas");tmp.width=W;tmp.height=H;const ctx=tmp.getContext("2d");ctx.drawImage(cv,0,0);
@@ -531,6 +534,12 @@ return(
 <Sc t={L?"Bilgi":"Info"}><div style={{fontSize:9,color:txM,lineHeight:1.8}}>
 {[["Pts",`${(data.nOrig/1e6).toFixed(2)}M → ${(aP.x.length/1e3).toFixed(0)}K`],["Norm","✓ "+normRange],["Z raw",`${aB.z0.toFixed(1)}→${aB.z1.toFixed(1)}`],["X",`${aB.x0.toFixed(1)}→${aB.x1.toFixed(1)}`],["Y",`${aB.y0.toFixed(1)}→${aB.y1.toFixed(1)}`],[L?"Alan":"Area",`${((aB.x1-aB.x0)*(aB.y1-aB.y0)).toFixed(0)} m²`]].map(([k,v])=>
 <div key={k} style={{display:"flex",justifyContent:"space-between"}}><span>{k}</span><span style={{color:tx}}>{v}</span></div>)}</div></Sc>
+{lasInfo&&<Sc t={L?"LAS Dosyası":"LAS File"}><div style={{fontSize:9,color:txM,lineHeight:1.8}}>
+{[[L?"Sürüm":"Version",`LAS ${data.ver}`],[L?"Nokta":"Points",lasInfo.subsampled?`${lasInfo.pointCount.toLocaleString()} / ${lasInfo.originalCount.toLocaleString()}`:lasInfo.originalCount.toLocaleString()],[L?"Nokta yoğunluğu":"Point density",`${lasInfo.densityPerM2.toFixed(1)} pts/m²`],[L?"Kapsam":"Extent",`${lasInfo.widthM.toFixed(0)} × ${lasInfo.heightM.toFixed(0)} m`],[L?"Alan (bbox)":"Area (bbox)",`${lasInfo.areaHa.toFixed(2)} ha`],[L?"Yükseklik":"Elevation",`${lasInfo.minElev.toFixed(1)}→${lasInfo.maxElev.toFixed(1)} m`],["RGB",lasInfo.hasRGB?(L?"var":"yes"):(L?"yok":"no")],["EPSG",lasInfo.epsg?`${lasInfo.epsg}${lasInfo.epsgName?" · "+lasInfo.epsgName:""}`:(L?"okunmuyor":"not read")]].map(([k,v])=>
+<div key={k} style={{display:"flex",justifyContent:"space-between"}}><span>{k}</span><span style={{color:tx}}>{v}</span></div>)}
+{lasInfo.classes.length>0&&<><div style={{marginTop:4,color:txD}}>{L?"Sınıf dağılımı (ASPRS)":"Class distribution (ASPRS)"}{lasInfo.subsampled?(L?" · örneklem":" · sample"):""}</div>
+{lasInfo.classes.map(c=>{const col=clsCol(c.code).map(v=>Math.round(v*255));return(<div key={c.code} style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:7,height:7,borderRadius:2,background:`rgb(${col.join(",")})`,display:"inline-block"}}/>{c.code} · {c.label}</span><span style={{color:tx}}>{c.pct.toFixed(1)}%</span></div>);})}</>}
+</div></Sc>}
 <Sc t={L?"Dışa Aktar":"Export"}><button style={{...BT(true),width:"100%"}} onClick={hImg}>🖼 {L?"Görüntü Kaydet":"Save Image"}</button></Sc></>)}
 
 {tab==="clip"&&view==="3d"&&<Sc t="Clip"><div style={{fontSize:10,color:og,padding:8,background:og+"11",borderRadius:4}}>⚠ 2D</div></Sc>}
@@ -572,18 +581,27 @@ return(
 {segs&&<div style={{color:gn2,fontSize:10,marginTop:4}}>{met?`${met.length} ${L?"ağaç ölçüldü":"trees measured"} (${segs.count} ${L?"segment":"segments"})`:`${segs.count} ${L?"segment":"segments"}`}</div>}
 </Sc>)}
 
-{tab==="metrics"&&(<Sc t={L?"Ağaç Metrikleri":"Tree Metrics"}>{!met?<div style={{fontSize:10,color:txD}}>{L?"Segmentasyon yapın":"Run seg"}</div>:(
+{tab==="metrics"&&(<Sc t={L?"Ağaç Metrikleri":"Tree Metrics"}>{!met?<div style={{fontSize:10,color:txD}}>{L?"Segmentasyon yapın":"Run seg"}</div>:(<>
+<div style={{display:"flex",gap:4,marginBottom:4}}><select style={{...IN,flex:1,width:"auto",minWidth:0}} value={sp} onChange={e=>setSp(e.target.value)}>{SP.map(s=><option key={s.id} value={s.id}>{spName(s,L)}</option>)}</select><button style={BT(true)} onClick={hSp}>{L?"Uygula":"Apply"}</button></div>
+{(()=>{const apId=met.find(m=>m.speciesId)?.speciesId,ap=SP.find(s=>s.id===apId),oor=ap?met.filter(m=>!Number.isFinite(m.dbhModel)).length:0;return(<>
+{ap&&<div style={{fontSize:9,color:txM,marginBottom:4}}>{L?"Uygulanan tür: ":"Applied species: "}<span style={{color:gn2}}>{spName(ap,L)}</span>{ap.id!==sp&&<span style={{color:og}}>{L?" · seçim değişti, Uygula'ya basın":" · selection changed, press Apply"}</span>}</div>}
+<div style={{fontSize:8,color:txM,marginBottom:6,padding:6,background:ac+"11",border:`1px solid ${ac}33`,borderRadius:4,lineHeight:1.4}}>{L?"H, CD ve DBH₁: FORA'nın otomatik tahminleri. H₂, CD₂ ve DBH₂: sahada ölçtüğünüz değerler (isteğe bağlı), İstat sekmesinde karşılaştırılır.":"H, CD and DBH₁: FORA's automatic estimates. H₂, CD₂ and DBH₂: your field measurements (optional), compared in the Stats tab."}</div>
+{!ap&&<div style={{fontSize:9,color:og,marginBottom:6,padding:"4px 6px",background:og+"11",borderRadius:4,lineHeight:1.4}}>{L?"DBH₁ boş: yukarıdan tür seçip Uygula'ya basın.":"DBH₁ is empty: pick a species above and press Apply."}</div>}
+{oor>0&&<div style={{fontSize:9,color:og,marginBottom:6,padding:"4px 6px",background:og+"11",borderRadius:4,lineHeight:1.4}}>{L?`${oor} ağacın boyu bu türün modelinin geçerli aralığı dışında; DBH₁ (ve biyokütle) hesaplanamadı (–).`:`${oor} trees are outside this species model's height range; DBH₁ (and biomass) not computed (–).`}</div>}
+{met.length>200&&<div style={{fontSize:8,color:txD,marginBottom:4}}>{L?`İlk 200 ağaç gösteriliyor; CSV'de ${met.length} ağacın tümü var.`:`Showing the first 200 trees; the CSV has all ${met.length}.`}</div>}
+</>);})()}
 <div style={{overflowX:"auto"}}><button style={{...BT(true),marginBottom:6,fontSize:9}} onClick={hCSV}>📥 CSV</button>
-<table style={{width:"100%",borderCollapse:"collapse",fontSize:8}}><thead><tr>{["#","H","CD","X","Y","DBH₁","DBH₂","H₂","CD₂","N"].map(h=><th key={h} style={{textAlign:"left",padding:"2px",borderBottom:`1px solid ${bd}`,color:txD,fontWeight:500}}>{h}</th>)}</tr></thead>
+<table style={{width:"100%",borderCollapse:"collapse",fontSize:8}}><thead><tr>{[["#",L?"Ağaç no":"Tree ID"],["H",L?"Otomatik boy (m)":"Auto height (m)"],["CD",L?"Otomatik taç çapı (m)":"Auto crown diameter (m)"],["X",L?"Taç merkezi X (dosya koordinatı)":"Crown centre X (file CRS)"],["Y",L?"Taç merkezi Y (dosya koordinatı)":"Crown centre Y (file CRS)"],["DBH₁",L?"Model DBH tahmini (cm), tür seçip Uygula'ya basınca dolar":"Modelled DBH (cm), fills after you pick a species and press Apply"],["DBH₂",L?"Sahada ölçülen DBH (cm), elle girilir":"Field-measured DBH (cm), entered by hand"],["H₂",L?"Sahada ölçülen boy (m), elle girilir":"Field-measured height (m), entered by hand"],["CD₂",L?"Sahada ölçülen taç çapı (m), elle girilir":"Field-measured crown diameter (m), entered by hand"],["N",L?"Ağaca ait nokta sayısı":"Points in the tree"]].map(([h,t])=><th key={h} title={t} style={{textAlign:"left",padding:"2px",borderBottom:`1px solid ${bd}`,color:txD,fontWeight:500,cursor:"help"}}>{h}</th>)}</tr></thead>
 <tbody>{met.slice(0,200).map((m,i)=>(<tr key={m.id} style={{background:sel===m.id?ac+"15":i%2===0?"transparent":bd+"22",cursor:"pointer"}} onClick={()=>{setSel(sel===m.id?null:m.id);setCMode("segment");}}>
 <td style={{padding:"2px",color:CL[(m.id-1)%CL.length],fontWeight:700}}>{m.id}</td><td style={{padding:"2px"}}>{m.h.toFixed(1)}</td><td style={{padding:"2px"}}>{m.cd.toFixed(1)}</td>
-<td style={{padding:"2px",fontSize:7}}>{m.cx.toFixed(1)}</td><td style={{padding:"2px",fontSize:7}}>{m.cy.toFixed(1)}</td><td style={{padding:"2px",color:gn2}}>{m.dbhModel?.toFixed(1)||"–"}</td>
+<td style={{padding:"2px",fontSize:7}}>{m.cx.toFixed(1)}</td><td style={{padding:"2px",fontSize:7}}>{m.cy.toFixed(1)}</td><td style={{padding:"2px",color:gn2}} title={m.speciesId&&!Number.isFinite(m.dbhModel)?(L?"Model aralığı dışında":"Outside model range"):undefined}>{Number.isFinite(m.dbhModel)?m.dbhModel.toFixed(1):"–"}</td>
 <td style={{padding:"1px"}}><input value={m.dbhManual} onChange={e=>uMet(m.id,"dbhManual",e.target.value)} style={{...IN,width:26,padding:"1px 2px"}}/></td>
 <td style={{padding:"1px"}}><input value={m.hManual} onChange={e=>uMet(m.id,"hManual",e.target.value)} style={{...IN,width:26,padding:"1px 2px"}}/></td>
 <td style={{padding:"1px"}}><input value={m.cdManual} onChange={e=>uMet(m.id,"cdManual",e.target.value)} style={{...IN,width:26,padding:"1px 2px"}}/></td>
-<td style={{padding:"2px"}}>{m.cnt}</td></tr>))}</tbody></table></div>)}</Sc>)}
+<td style={{padding:"2px"}}>{m.cnt}</td></tr>))}</tbody></table></div></>)}</Sc>)}
 
 {tab==="area"&&(<Sc t={L?"Alan Bazlı":"Area-Based"}>
+<div style={{fontSize:8,color:txM,marginBottom:6,padding:6,background:ac+"11",border:`1px solid ${ac}33`,borderRadius:4,lineHeight:1.4}}>{L?"Persentil ve yoğunluk metrikleri doğrudan noktalardan gelir, ağaçlardan bağımsızdır. ITC bölümü (ağaç sayısı, N/ha) için önce Seg çalıştırın. Seg yeniden çalışınca buradaki sonuçlar silinir; tekrar Hesapla'ya basın.":"Percentile and density metrics come straight from the points, independent of trees. The ITC part (tree count, N/ha) needs Seg first. Re-running Seg clears these results; press Calculate again."}</div>
 <button style={{...BT(true),width:"100%",marginBottom:4}} onClick={hArea}>📊 {L?"Hesapla":"Calculate"}</button>
 {areaMet&&<button style={{...BT(true),width:"100%",marginBottom:8,fontSize:9}} onClick={hAreaCSV}>📥 {L?"Alan CSV":"Area CSV"}</button>}
 {areaErr&&<div style={{fontSize:9,color:og,marginBottom:6,padding:4,background:og+"11",borderRadius:4}}>⚠ {areaErr}</div>}
@@ -596,7 +614,7 @@ return(
 <div style={{fontSize:10,fontWeight:600,color:ac,marginTop:8,marginBottom:4}}>{L?"Yoğunluk":"Density"}</div>
 {[["D1",areaMet.d1],["D3",areaMet.d3],["D5",areaMet.d5],["D7",areaMet.d7],["D9",areaMet.d9],["CC₁.₃",areaMet.cc13]].map(([k,v])=><div key={k} style={{display:"flex",justifyContent:"space-between"}}><span>{k}</span><span style={{color:tx}}>{(v*100).toFixed(1)}%</span></div>)}
 <div style={{fontSize:10,fontWeight:600,color:ac,marginTop:8,marginBottom:4}}>ITC</div>
-{[[L?"Ağaç":"Trees",areaMet.itc_n],["Max",areaMet.itc_max.toFixed(1)+" m"],["Min",areaMet.itc_min.toFixed(1)+" m"],["Mean",areaMet.itc_mean.toFixed(1)+" m"],["N/ha",areaMet.density.toFixed(0)]].map(([k,v])=><div key={k} style={{display:"flex",justifyContent:"space-between"}}><span>{k}</span><span style={{color:tx}}>{v}</span></div>)}
+{areaMet.itc_n===0?<div style={{fontSize:9,color:txD}}>{L?"Segmentasyon yapılmadı":"No segmentation yet"}</div>:[[L?"Ağaç":"Trees",areaMet.itc_n],["Max",areaMet.itc_max.toFixed(1)+" m"],["Min",areaMet.itc_min.toFixed(1)+" m"],["Mean",areaMet.itc_mean.toFixed(1)+" m"],["N/ha",areaMet.density.toFixed(0)]].map(([k,v])=><div key={k} style={{display:"flex",justifyContent:"space-between"}}><span>{k}</span><span style={{color:tx}}>{v}</span></div>)}
 </div>)}</Sc>)}
 
 {tab==="stats"&&(<Sc t={L?"İstatistik":"Statistics"}>{!met?<div style={{fontSize:10,color:txD}}>Run seg</div>:(()=>{
@@ -608,7 +626,7 @@ const SB=({l,s})=>!s?<div style={{fontSize:9,color:txD,marginBottom:6}}>{l}: min
 return(<><div style={{fontSize:9,color:txD,marginBottom:8}}>{L?"Manuel değer girin":"Enter manual values"}</div>
 <SB l="H" s={cSt(wH.map(m=>({a:+m.hManual,b:m.h})))}/><SB l="CD" s={cSt(wC.map(m=>({a:+m.cdManual,b:m.cd})))}/><SB l="DBH" s={cSt(wD.map(m=>({a:+m.dbhManual,b:m.dbhModel})))}/></>);})()}</Sc>)}
 
-{tab==="species"&&(<Sc t={L?"Tür":"Species"}><select style={{...IN,width:"100%",marginBottom:6}} value={sp} onChange={e=>setSp(e.target.value)}>{SP.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select>
+{tab==="species"&&(<Sc t={L?"Tür":"Species"}><select style={{...IN,width:"100%",marginBottom:6}} value={sp} onChange={e=>setSp(e.target.value)}>{SP.map(s=><option key={s.id} value={s.id}>{spName(s,L)}</option>)}</select>
 <div style={{fontSize:9,color:txD,marginBottom:6,padding:"4px 6px",background:dk,borderRadius:3,borderLeft:`2px solid ${ac}`}}>📖 {SP.find(s=>s.id===sp)?.ref||""}</div>
 {SP.find(s=>s.id===sp)?.experimental&&<div style={{fontSize:9,color:og,marginBottom:6,padding:"4px 6px",background:dk,borderRadius:3,borderLeft:`2px solid ${og}`,fontWeight:600}}>⚠ {L?"BETA: Bu tür için Türkiye-kalibreli katsayılar henüz doğrulanmadı. Sonuçlar yaklaşık — dikkatli kullanın.":"BETA: Turkey-calibrated coefficients not yet verified for this species. Results are approximate — use with caution."}</div>}
 {sp.startsWith("pb")&&<div style={{fontSize:9,color:gn2,marginBottom:6,padding:"4px 6px",background:dk,borderRadius:3,borderLeft:`2px solid ${gn2}`}}>🌲 {L?"Biyokütle: Sönmez et al. 2016":"Biomass: Sönmez et al. 2016"}</div>}
