@@ -275,9 +275,10 @@ const spName=(s,L)=>s?(L?s.nameTR:s.nameEN):"";
 function dlF(blob,name){const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(url),1000);}
 
 // --- citation ---
-const FORA_VERSION="1.8.0";
+const FORA_VERSION="1.9.0";
 const FORA_DOI="10.5281/zenodo.19546162";
 const FORA_REPO="https://github.com/fora-platform/fora";
+const FORA_PAPER_DOI="10.1016/j.softx.2026.102927";
 const FORA_BIBTEX=`@software{gencal_fora_2026,
   author    = {Gencal, Burhan},
   title     = {{FORA}: A browser-based platform for {UAV-LiDAR} forest point cloud analysis},
@@ -506,7 +507,7 @@ if(!data)return(
 <span style={{fontSize:9,fontWeight:700,color:txM}}>BibTeX</span>
 <button onClick={()=>{navigator.clipboard?.writeText(FORA_BIBTEX).then(()=>{setCiteCopied(true);setTimeout(()=>setCiteCopied(false),1500);});}} style={{...BT(citeCopied),fontSize:9,padding:"2px 8px"}}>{citeCopied?(L?"✓ Kopyalandı":"✓ Copied"):(L?"Kopyala":"Copy")}</button></div>
 <pre style={{fontSize:8,color:tx,margin:0,whiteSpace:"pre-wrap",wordBreak:"break-word",fontFamily:"inherit",lineHeight:1.4}}>{FORA_BIBTEX}</pre>
-<div style={{fontSize:8,color:txD,marginTop:6,lineHeight:1.5}}>{L?"Yazılımı kullanırsanız lütfen yukarıdaki Zenodo kaydına atıf verin. Eşlik eden makale yayımlandığında bu bilgi güncellenecektir.":"If you use this software, please cite the Zenodo record above. This will be updated when the accompanying paper is published."}</div>
+<div style={{fontSize:8,color:txD,marginTop:6,lineHeight:1.5}}>{L?"Yazılımı kullanırsanız lütfen SoftwareX makalesine ve yukarıdaki Zenodo kaydına atıf verin. Makale: ":"If you use this software, please cite the SoftwareX article and the Zenodo record above. Article: "}<a href={`https://doi.org/${FORA_PAPER_DOI}`} target="_blank" rel="noopener noreferrer" style={{color:ac}}>doi.org/{FORA_PAPER_DOI}</a></div>
 </div>)}
 </div></div>);
 
