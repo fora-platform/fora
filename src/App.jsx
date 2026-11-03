@@ -4,6 +4,7 @@ import*as THREE from"three";
 import{parseLAS}from"./lasParser.js";
 import{getLasInfo}from"./lasInfo.js";
 import{standCarbon,treeCarbon,CARBON_DEFAULTS}from"./carbon.js";
+import{layerOf,classifyByHeight,layerSummary,VEG_THRESHOLDS,LAYER_COLOURS}from"./vegLayers.js";
 
 
 // ASPRS classification colours (ground, low/med/high vegetation, building, water)
@@ -292,13 +293,18 @@ const[vwsMode,setVwsMode]=useState(false);const[vwsPreset,setVwsPreset]=useState
 const[vwsCustom,setVwsCustom]=useState({mode:"linear",a:2.5,b:0.05,c:0,min:2,max:5});
 const[tab,setTab]=useState("tools");const[theme,setTheme]=useState("dark");const[pan,setPan]=useState({x:0,y:0});const[zoom,setZoom]=useState(1);
 const[tMode,setTMode]=useState(false);const[tP1,setTP1]=useState(null);const[tP2,setTP2]=useState(null);const[tData,setTData]=useState(null);
-const[lasInfo,setLasInfo]=useState(null);const[cOpt,setCOpt]=useState({cf:String(CARBON_DEFAULTS.carbonFraction),r:String(CARBON_DEFAULTS.rootToShoot)});const[showLaz,setShowLaz]=useState(true);const[showCite,setShowCite]=useState(false);const[citeCopied,setCiteCopied]=useState(false);
+const[lasInfo,setLasInfo]=useState(null);const[vegThr,setVegThr]=useState({g:String(VEG_THRESHOLDS.groundMax),l:String(VEG_THRESHOLDS.lowMax),m:String(VEG_THRESHOLDS.mediumMax)});const[cOpt,setCOpt]=useState({cf:String(CARBON_DEFAULTS.carbonFraction),r:String(CARBON_DEFAULTS.rootToShoot)});const[showLaz,setShowLaz]=useState(true);const[showCite,setShowCite]=useState(false);const[citeCopied,setCiteCopied]=useState(false);
 const topR=useRef(null),sideR=useRef(null),transR=useRef(null),threeR=useRef(null),cleanR=useRef(null);
 const dragR=useRef({on:false,moved:false,sx:0,sy:0,px:0,py:0});
 const dR=useRef(),zR=useRef(),cR=useRef(),czR=useRef(),mR=useRef();
 dR.current=data;zR.current=zN;cR.current=clp;czR.current=clpZ;mR.current=met;
 const cam3D=useRef({theta:Math.PI/4,phi:Math.PI/3.2,dist:0});
 const aP=clp||data,aZ=clpZ||zN,aB=clp?clpB:bnd,L=lang==="TR";
+// vegetation layers: thresholds must be increasing, otherwise the defaults are used (and the panel says so)
+const vgN=parseFloat(vegThr.g),vlN=parseFloat(vegThr.l),vmN=parseFloat(vegThr.m),vOk=vgN>=0&&vlN>vgN&&vmN>vlN;
+const vg=vOk?vgN:VEG_THRESHOLDS.groundMax,vl=vOk?vlN:VEG_THRESHOLDS.lowMax,vm=vOk?vmN:VEG_THRESHOLDS.mediumMax;
+const vT=useMemo(()=>({groundMax:vg,lowMax:vl,mediumMax:vm}),[vg,vl,vm]);
+const vegSum=useMemo(()=>cMode==="veglayer"&&aZ?layerSummary(classifyByHeight(aZ,aZ.length,vT).counts):null,[cMode,aZ,vT]);
 const dk=theme==="dark"?"#080b10":"#f5f5f5",pn2=theme==="dark"?"#0f1319":"#fff",bd=theme==="dark"?"#1a2030":"#d4d4d4";
 const ac="#22d3ee",gn2="#34d399",og="#f59e0b",tx=theme==="dark"?"#c9d1d9":"#1a1a1a",txD=theme==="dark"?"#4a5568":"#9ca3af",txM=theme==="dark"?"#7b8594":"#6b7280";
 const BT=on=>({padding:"4px 10px",background:on?ac+"1a":pn2,color:on?ac:txM,border:`1px solid ${on?ac+"55":bd}`,borderRadius:4,cursor:"pointer",fontSize:10,fontFamily:"inherit",fontWeight:on?600:400});
@@ -370,6 +376,7 @@ else if(cMode==="segment"&&segs){const l=segs.labels[i];ctx.fillStyle=l<=0?(them
 else if(cMode==="normalized"&&aZ){const t=Math.min(1,aZ[i]/30);const[cr2,cg,cb]=hC(t);ctx.fillStyle=`rgb(${cr2*255|0},${cg*255|0},${cb*255|0})`;}
 else if(cMode==="intensity"){const v=Math.min(255,aP.intensity[i]);ctx.fillStyle=`rgb(${v},${v},${v})`;}
 else if(cMode==="classification"){const[cr2,cg,cb]=clsCol(aP.classification[i]);ctx.fillStyle=`rgb(${cr2*255|0},${cg*255|0},${cb*255|0})`;}
+else if(cMode==="veglayer"&&aZ){const c=LAYER_COLOURS[layerOf(aZ[i],vT)];ctx.fillStyle=`rgb(${c[0]},${c[1]},${c[2]})`;}
 else{const t=aB.z1===aB.z0?.5:(aP.z[i]-aB.z0)/(aB.z1-aB.z0);const[cr2,cg,cb]=hC(t);ctx.fillStyle=`rgb(${cr2*255|0},${cg*255|0},${cb*255|0})`;}
 ctx.fillRect(px,py,ptSz,ptSz);}
 if(!clp&&cc&&isTop){const cx2=oX+(cc.x-xMn)*sc,cy2=oY-(cc.y-yMn)*sc,r2=cr*sc;ctx.shadowColor="#00ffff";ctx.shadowBlur=12;ctx.strokeStyle="#00ffff";ctx.lineWidth=3;ctx.setLineDash([8,4]);ctx.beginPath();if(cs==="circle")ctx.arc(cx2,cy2,r2,0,Math.PI*2);else ctx.rect(cx2-r2,cy2-r2,r2*2,r2*2);ctx.stroke();ctx.setLineDash([]);ctx.shadowBlur=0;ctx.fillStyle="#00ffff";ctx.beginPath();ctx.arc(cx2,cy2,6,0,Math.PI*2);ctx.fill();ctx.font="bold 14px monospace";ctx.fillText(`r=${cr}m`,cx2+10,cy2-10);}
@@ -391,7 +398,7 @@ ctx.beginPath();for(let i=0;i<sorted.length;i++){const x=pL+sorted[i].dist*sx,y=
 for(const p of tData){const px=pL+p.dist*sx,py=H-pBt-p.zN*sz,t=mZ>0?p.zN/mZ:0;const[r,g,b2]=hC(t);ctx.fillStyle=`rgb(${r*255|0},${g*255|0},${b2*255|0})`;ctx.fillRect(px-1,py-1,2,2);}
 if(mZ>1.3){const y=H-pBt-1.3*sz;ctx.strokeStyle="#f5920055";ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(pL,y);ctx.lineTo(W-pRt,y);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle="#f59200";ctx.font="10px monospace";ctx.fillText("1.3m",W-pRt+2,y+4);}
 ctx.fillStyle=ac;ctx.font="bold 12px monospace";ctx.fillText(`Transect: ${mD2.toFixed(1)}m | Hmax: ${mZ.toFixed(1)}m | ${tData.length}pts`,pL,14);}
-},[aP,aB,aZ,cc,cr,cs,cMode,segs,ptSz,ptPct,clp,sel,pan,zoom,theme,dk,txD,tP1,tP2,tData]);
+},[aP,aB,aZ,cc,cr,cs,cMode,segs,ptSz,ptPct,clp,sel,pan,zoom,theme,dk,txD,tP1,tP2,tData,vT]);
 useEffect(()=>{if(view==="2d")draw2D();},[draw2D,view]);
 // Transect canvas, açılma animasyonu (height 0→160) bittikten sonra 0-yükseklikli
 // canvas'a çizildiği için ilk anda boş kalıyordu. Konteyner gerçek yüksekliğe
@@ -416,6 +423,7 @@ else if(cMode==="segment"&&segs){const l=segs.labels[i];if(l<=0){col[j*3]=.06;co
 else if(cMode==="normalized"&&aZ){const t=Math.min(1,aZ[i]/30);const[r,g,b2]=hC(t);col[j*3]=r;col[j*3+1]=g;col[j*3+2]=b2;}
 else if(cMode==="intensity"){const v=Math.min(1,aP.intensity[i]/255);col[j*3]=v;col[j*3+1]=v;col[j*3+2]=v;}
 else if(cMode==="classification"){const[r2,g2,b3]=clsCol(aP.classification[i]);col[j*3]=r2;col[j*3+1]=g2;col[j*3+2]=b3;}
+else if(cMode==="veglayer"&&aZ){const c=LAYER_COLOURS[layerOf(aZ[i],vT)];col[j*3]=c[0]/255;col[j*3+1]=c[1]/255;col[j*3+2]=c[2]/255;}
 else{const t=aB.z1===aB.z0?.5:(aP.z[i]-aB.z0)/(aB.z1-aB.z0);const[r,g,b2]=hC(t);col[j*3]=r;col[j*3+1]=g;col[j*3+2]=b2;}j++;}
 const geom=new THREE.BufferGeometry();geom.setAttribute("position",new THREE.BufferAttribute(pos,3));geom.setAttribute("color",new THREE.BufferAttribute(col,3));
 const mat=new THREE.PointsMaterial({size:ptSz*.8,vertexColors:true,sizeAttenuation:true});scene.add(new THREE.Points(geom,mat));
@@ -427,7 +435,7 @@ const oU=()=>{drag=false;};const oW=e=>{dist*=e.deltaY>0?1.08:.92;dist=Math.max(
 dE.addEventListener("mousedown",oD);dE.addEventListener("mousemove",oM);dE.addEventListener("mouseup",oU);dE.addEventListener("mouseleave",oU);dE.addEventListener("wheel",oW,{passive:false});
 let aId;const an=()=>{aId=requestAnimationFrame(an);ren.render(scene,cam);};an();
 cleanR.current=()=>{cam3D.current={theta,phi,dist};cancelAnimationFrame(aId);dE.removeEventListener("mousedown",oD);dE.removeEventListener("mousemove",oM);dE.removeEventListener("mouseup",oU);dE.removeEventListener("mouseleave",oU);dE.removeEventListener("wheel",oW);geom.dispose();mat.dispose();ren.dispose();try{ren.forceContextLoss();}catch(_){}if(el.contains(dE))el.removeChild(dE);};
-return()=>{if(cleanR.current){cleanR.current();cleanR.current=null;}};},[view,aP,aB,aZ,cMode,segs,sel,ptSz,ptPct,theme]);
+return()=>{if(cleanR.current){cleanR.current();cleanR.current=null;}};},[view,aP,aB,aZ,cMode,segs,sel,ptSz,ptPct,theme,vT]);
 
 // --- mouse ---
 const handleMouse=useCallback((e,act)=>{const c=topR.current;if(!c||!c._tr)return;const rect=c.getBoundingClientRect();
@@ -490,7 +498,7 @@ return(
 {segs&&<span title={L?"Ölçülen ağaç (≥5 nokta) / bulunan segment":"Measured trees (≥5 points) / detected segments"} style={{fontSize:9,color:gn2,background:gn2+"11",padding:"1px 5px",borderRadius:3}}>{met?`${met.length} / ${segs.count}`:segs.count} {L?"ağaç":"trees"}</span>}
 {msg&&<span style={{color:og}}>{msg}</span>}<div style={{flex:1}}/>
 <div style={{display:"flex",border:`1px solid ${bd}`,borderRadius:4,overflow:"hidden"}}><button style={{...BT(view==="2d"),borderRadius:0,border:"none",padding:"3px 12px"}} onClick={()=>setView("2d")}>2D</button><button style={{...BT(view==="3d"),borderRadius:0,border:"none",padding:"3px 12px",borderLeft:`1px solid ${bd}`}} onClick={()=>setView("3d")}>3D</button></div>
-<select style={IN} value={cMode} onChange={e=>setCMode(e.target.value)}><option value="height">{L?"Yükseklik":"Height"}</option><option value="normalized">Normalize</option>{aP.hasRGB&&<option value="rgb">RGB</option>}<option value="intensity">{L?"Yoğunluk":"Intensity"}</option><option value="classification">{L?"Sınıf":"Classification"}</option>{segs&&<option value="segment">Segment</option>}</select>
+<select style={IN} value={cMode} onChange={e=>{setCMode(e.target.value);if(e.target.value==="veglayer")setTab("tools");}}><option value="height">{L?"Yükseklik":"Height"}</option><option value="normalized">Normalize</option>{aP.hasRGB&&<option value="rgb">RGB</option>}<option value="intensity">{L?"Yoğunluk":"Intensity"}</option><option value="classification">{L?"Sınıf":"Classification"}</option><option value="veglayer">{L?"Vejetasyon katmanı":"Vegetation layers"}</option>{segs&&<option value="segment">Segment</option>}</select>
 <button aria-label={L?"Tema değiştir":"Toggle theme"} title={L?"Tema değiştir":"Toggle theme"} style={BT(theme==="light")} onClick={()=>setTheme(t=>t==="dark"?"light":"dark")}>{theme==="dark"?"☀":"🌙"}</button>
 <div style={{display:"flex",border:`1px solid ${bd}`,borderRadius:4,overflow:"hidden"}}><button style={{...BT(L),borderRadius:0,border:"none",padding:"3px 8px"}} onClick={()=>setLang("TR")}>TR</button><button style={{...BT(!L),borderRadius:0,border:"none",padding:"3px 8px",borderLeft:`1px solid ${bd}`}} onClick={()=>setLang("EN")}>EN</button></div>
 {clp&&<button aria-label={L?"Kırpmayı sıfırla":"Reset clip"} title={L?"Kırpmayı sıfırla":"Reset clip"} style={BT(false)} onClick={hReset}>↩</button>}
@@ -530,6 +538,17 @@ return(
 {tab==="tools"&&(<><Sc t={L?"Görüntü":"Display"}>
 <Rw l={L?"Boyut":"Size"}><input type="range" min={.5} max={5} step={.25} value={ptSz} onChange={e=>setPtSz(+e.target.value)} style={{flex:1}}/><span style={{fontSize:9,color:txM,width:20}}>{ptSz}</span></Rw>
 <Rw l={L?"Örnekleme":"Sample"}><input type="range" min={10} max={100} step={5} value={ptPct} onChange={e=>setPtPct(+e.target.value)} style={{flex:1}}/><span style={{fontSize:9,color:txM,width:28}}>{ptPct}%</span></Rw></Sc>
+{cMode==="veglayer"&&<Sc t={L?"Vejetasyon Katmanı":"Vegetation Layers"}>
+<div style={{display:"flex",flexWrap:"wrap",gap:8,fontSize:9,color:txM,marginBottom:6}}>
+{[["g",L?"Zemin <":"Ground <"],["l",L?"Düşük <":"Low <"],["m",L?"Orta <":"Medium <"]].map(([k,lab])=><label key={k} style={{display:"flex",alignItems:"center",gap:3}}>{lab}<input type="number" step="0.5" min="0" value={vegThr[k]} onChange={e=>setVegThr({...vegThr,[k]:e.target.value})} style={{...IN,width:40,padding:"1px 3px"}}/>m</label>)}
+{(vegThr.g!==String(VEG_THRESHOLDS.groundMax)||vegThr.l!==String(VEG_THRESHOLDS.lowMax)||vegThr.m!==String(VEG_THRESHOLDS.mediumMax))&&<button style={{...BT(false),fontSize:8,padding:"1px 6px"}} onClick={()=>setVegThr({g:String(VEG_THRESHOLDS.groundMax),l:String(VEG_THRESHOLDS.lowMax),m:String(VEG_THRESHOLDS.mediumMax)})}>{L?"Varsayılana dön":"Reset"}</button>}</div>
+{!vOk&&<div style={{fontSize:8,color:og,marginBottom:4}}>{L?"Eşikler artan sırada olmalı (zemin < düşük < orta); varsayılanlar kullanılıyor.":"Thresholds must increase (ground < low < medium); using the defaults."}</div>}
+{vegSum&&<div style={{fontSize:9,color:txM,lineHeight:1.8}}>
+{[[0,L?`Zemin / diğer (< ${vg} m)`:`Ground / other (< ${vg} m)`,vegSum.total-vegSum.vegetationPoints],[1,L?`Düşük (${vg}–${vl} m)`:`Low (${vg}–${vl} m)`,vegSum.layers[0].count],[2,L?`Orta (${vl}–${vm} m)`:`Medium (${vl}–${vm} m)`,vegSum.layers[1].count],[3,L?`Yüksek (> ${vm} m)`:`High (> ${vm} m)`,vegSum.layers[2].count]].map(([k,lab,cnt])=>{const c=LAYER_COLOURS[k];return(
+<div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:7,height:7,borderRadius:2,background:`rgb(${c.join(",")})`,display:"inline-block"}}/>{lab}</span><span style={{color:tx}}>{vegSum.total>0?(100*cnt/vegSum.total).toFixed(1):"0.0"}%</span></div>);})}
+<div style={{marginTop:4}}>{L?`Vejetasyon noktalarının %${(vegSum.understoreyFraction*100).toFixed(1)}'i kanopi altında (düşük + orta).`:`${(vegSum.understoreyFraction*100).toFixed(1)}% of vegetation points are below the canopy (low + medium).`}</div></div>}
+<div style={{fontSize:8,color:txM,marginTop:6,padding:6,background:ac+"11",border:`1px solid ${ac}33`,borderRadius:4,lineHeight:1.4}}>{L?"Katmanlar normalize yüksekliğe (zeminden yükseklik) göre ayrılır; dosyadaki sınıf alanı kullanılmaz. Varsayılan eşikler yaygın ormancılık ayrımıdır, alanınıza göre değiştirebilirsiniz. Zemini bulunamayan noktalar 'diğer' sayılır. Yüzdeler görüntülenen alandaki (kırpıldıysa kırpılan) tüm noktalara göredir.":"Layers are split by normalised height (height above ground); the file's class field is not used. The default thresholds are a common forestry split; adjust them to your site. Points with no ground estimate count as 'other'. Percentages are of all points in the current area (the clip, if any)."}</div>
+</Sc>}
 <Sc t={L?"Yer (DTM)":"Ground (DTM)"}>
 <div style={{fontSize:9,color:txM,marginBottom:4,lineHeight:1.4}}>{L?"Yeni dosyada normalize için":"Used when loading a new file"}</div>
 <label style={{fontSize:10,color:tx,display:"flex",alignItems:"center",gap:4,marginBottom:3,cursor:"pointer"}}><input type="radio" name="dtmSrc" checked={dtmSrc==="auto"} onChange={()=>setDtmSrc("auto")} style={{margin:0}}/>{L?"Otomatik (grid min-Z)":"Auto (grid min-Z)"}</label>
