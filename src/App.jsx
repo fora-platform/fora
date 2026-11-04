@@ -36,13 +36,22 @@ const ord=[];for(let r=0;r<rows;r++)for(let c=0;c<cols;c++)if(sm[r*cols+c]>=minH
 for(let p=0;p<8;p++){let ch=false;for(const{r,c}of ord){const k=r*cols+c;if(cl2[k])continue;let best=0,bh=-1;for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){if(!dr&&!dc)continue;const nr=r+dr,nc=c+dc;if(nr>=0&&nr<rows&&nc>=0&&nc<cols){const nk=nr*cols+nc;if(cl2[nk]&&sm[nk]>bh){bh=sm[nk];best=cl2[nk];}}}if(best){cl2[k]=best;ch=true;}}if(!ch)break;}
 const labels=new Int32Array(pts.x.length);for(let i=0;i<pts.x.length;i++){if(za[i]<minH)continue;const c=Math.floor((pts.x[i]-b.x0)/cell),r=Math.floor((pts.y[i]-b.y0)/cell);labels[i]=cl2[r*cols+c];}
 const u=new Set(labels);u.delete(0);const rm=new Map();let seq=1;for(const v of u)rm.set(v,seq++);for(let i=0;i<labels.length;i++)labels[i]=rm.get(labels[i])||0;return{labels,count:seq-1};}
-function makeMet(pts,za,labels,cnt,crownMode){if(!cnt)return[];const trees=[];for(let t=1;t<=Math.min(cnt,5000);t++){let x0=1/0,x1=-1/0,y0=1/0,y1=-1/0,hM=0,c=0;const tpts=[];
-for(let i=0;i<pts.x.length;i++){if(labels[i]!==t)continue;c++;tpts.push([pts.x[i],pts.y[i]]);if(pts.x[i]<x0)x0=pts.x[i];if(pts.x[i]>x1)x1=pts.x[i];if(pts.y[i]<y0)y0=pts.y[i];if(pts.y[i]>y1)y1=pts.y[i];if(za[i]>hM)hM=za[i];}
-if(c<5)continue;
+function makeMet(pts,za,labels,cnt,crownMode){if(!cnt)return[];
+// One pass over the points instead of one pass per tree: the old loop was
+// O(points × trees) and therefore capped at 5000 trees, silently dropping the rest.
+// Points are grouped by label with a counting sort, which keeps their original
+// order inside each tree, so hull sampling (and every result) is unchanged.
+const n=pts.x.length,counts=new Int32Array(cnt+1);
+for(let i=0;i<n;i++){const t=labels[i];if(t>0&&t<=cnt)counts[t]++;}
+const start=new Int32Array(cnt+2);for(let t=1;t<=cnt;t++)start[t+1]=start[t]+counts[t];
+const idx=new Int32Array(start[cnt+1]),fill=start.slice(0,cnt+1);
+for(let i=0;i<n;i++){const t=labels[i];if(t>0&&t<=cnt)idx[fill[t]++]=i;}
+const trees=[];for(let t=1;t<=cnt;t++){const c=counts[t];if(c<5)continue;const s0=start[t];let x0=1/0,x1=-1/0,y0=1/0,y1=-1/0,hM=0;
+for(let k=s0;k<s0+c;k++){const i=idx[k],px=pts.x[i],py=pts.y[i];if(px<x0)x0=px;if(px>x1)x1=px;if(py<y0)y0=py;if(py>y1)y1=py;if(za[i]>hM)hM=za[i];}
 const cdBbox=((x1-x0)+(y1-y0))/2,cpaBbox=Math.PI/4*(x1-x0)*(y1-y0);
 let cd=cdBbox,cpa=cpaBbox,cdConvex=null,cpaConvex=null,cdConcave=null,cpaConcave=null,actualMode=crownMode||"bbox";
-// Subsample if too many points (concave hull is O(n²))
-const samplePts=tpts.length>500?tpts.filter((_,i)=>i%Math.ceil(tpts.length/500)===0):tpts;
+// hull input: every k-th point, at most ~500 (concave hull is O(n²)); built only when a hull is needed
+let samplePts=[];if(crownMode==="convex"||crownMode==="concave"){const st=c>500?Math.ceil(c/500):1;for(let j=0;j<c;j+=st){const i=idx[s0+j];samplePts.push([pts.x[i],pts.y[i]]);}}
 if((crownMode==="convex"||crownMode==="concave")&&samplePts.length>=3){const hull=convexHull(samplePts);cpaConvex=polyArea(hull);cdConvex=hullMaxD(hull);}
 if(crownMode==="concave"&&samplePts.length>=4){const ch=concaveHull(samplePts,3);if(ch&&ch.length>=3){const a=polyArea(ch);
 // concave hull area can't exceed convex hull area; clamp if it does
@@ -275,11 +284,21 @@ const spName=(s,L)=>s?(L?s.nameTR:s.nameEN):"";
 function dlF(blob,name){const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(url),1000);}
 
 // --- citation ---
-const FORA_VERSION="1.9.0";
+const FORA_VERSION="1.9.1";
 const FORA_DOI="10.5281/zenodo.19546162";
 const FORA_REPO="https://github.com/fora-platform/fora";
 const FORA_PAPER_DOI="10.1016/j.softx.2026.102927";
-const FORA_BIBTEX=`@software{gencal_fora_2026,
+const FORA_BIBTEX=`@article{gencal_fora_softwarex_2026,
+  author  = {Gencal, Burhan},
+  title   = {{FORA}: An open-source browser-based platform for processing {UAV-LiDAR} point clouds in forest structures},
+  journal = {SoftwareX},
+  volume  = {35},
+  pages   = {102927},
+  year    = {2026},
+  doi     = {10.1016/j.softx.2026.102927}
+}
+
+@software{gencal_fora_2026,
   author    = {Gencal, Burhan},
   title     = {{FORA}: A browser-based platform for {UAV-LiDAR} forest point cloud analysis},
   year      = {2026},

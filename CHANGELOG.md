@@ -5,6 +5,39 @@ All notable changes to FORA will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.1] - 2026-11-04
+
+### Fixed
+
+- Tree metrics were limited to the first 5000 segments. In larger areas the
+  remaining trees were silently left out of the metrics table, the CSV, the PDF
+  report, stem density and the carbon totals. The limit is removed: tree metrics
+  are now computed in a single pass over the points, which gives identical results
+  and is much faster on large point clouds.
+- `npm test` failed on Node.js 22 and later; it now runs on Node 20 and newer.
+
+### Added
+
+- Tests for the carbon, vegetation-layer, LAS-info, PDF-text and LAZ modules,
+  including LAZ fixtures checked point by point against their LAS originals.
+- The citation box includes the BibTeX entry of the SoftwareX article.
+- ROADMAP.md with the planned work.
+
+### Security
+
+- Updated development dependencies (Browserslist, PostCSS, nanoid,
+  source-map-js, baseline-browser-mapping) to clear five of the seven `npm audit`
+  advisories. None of them affected the published site, which is built to static
+  files. Only versions published at least two weeks earlier were accepted. The two
+  remaining advisories concern the Vite development server and need a major Vite
+  upgrade, planned for v1.11.
+- The lockfile now records the package version (it still read 1.8.0).
+
+### Changed
+
+- Version reported in the interface, package.json, CITATION.cff and README
+  aligned at 1.9.1.
+
 ## [1.9.0] - 2026-11-03
 
 ### Added
