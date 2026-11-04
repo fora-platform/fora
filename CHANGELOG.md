@@ -5,6 +5,25 @@ All notable changes to FORA will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Transect: the profile panel opened below the visible area and was drawn while
+  it was still opening, so it stayed blurred until the view was switched to 3D and
+  back. The 2D view now shrinks to make room for the panel, and every 2D canvas is
+  redrawn when its size changes (also when the window is resized).
+- Text on the 2D map, the side view and the transect was drawn at half the intended
+  size on the high-resolution canvases.
+- The colour-mode menu was too narrow to read.
+
+### Added
+
+- Colour legend in the 2D and 3D views for every colour mode: elevation range,
+  height above ground, intensity, ASPRS classes and vegetation layers.
+- Transect: distance axis, height axis with even steps, A and B end labels on the
+  map and on the profile, and a title stating that heights are above ground.
+
 ## [1.9.1] - 2026-11-04
 
 ### Fixed

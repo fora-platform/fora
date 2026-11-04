@@ -403,11 +403,11 @@ const draw2D=useCallback(()=>{if(!aP||!aB)return;
 const drawC=(cv,isTop)=>{if(!cv||!cv.offsetWidth)return;const ctx=cv.getContext("2d");const W=cv.width=cv.offsetWidth*2,H=cv.height=cv.offsetHeight*2;ctx.fillStyle=dk;ctx.fillRect(0,0,W,H);
 const xA=aP.x,yA=isTop?aP.y:aP.z,xMn=aB.x0,xMx=aB.x1,yMn=isTop?aB.y0:aB.z0,yMx=isTop?aB.y1:aB.z1,rX=xMx-xMn||1,rY=yMx-yMn||1,bsc=Math.min((W-50)/rX,(H-50)/rY),sc=bsc*zoom;
 const oX=W/2-((xMn+xMx)/2-xMn)*sc+(isTop?pan.x*2:0),oY=H/2+((yMn+yMx)/2-yMn)*sc-(isTop?pan.y*2:0);
-ctx.strokeStyle=theme==="dark"?"#151a22":"#e5e5e5";ctx.lineWidth=1;const gs=nS(rX/zoom);ctx.font="14px monospace";ctx.fillStyle=txD;
+ctx.strokeStyle=theme==="dark"?"#151a22":"#e5e5e5";ctx.lineWidth=1;const gs=nS(rX/zoom);ctx.font="20px monospace";ctx.fillStyle=txD;
 for(let v=Math.floor(xMn/gs)*gs;v<=xMx;v+=gs){const px=oX+(v-xMn)*sc;if(px>0&&px<W){ctx.beginPath();ctx.moveTo(px,0);ctx.lineTo(px,H);ctx.stroke();ctx.fillText(v.toFixed(0),px+2,H-4);}}
 for(let v=Math.floor(yMn/gs)*gs;v<=yMx;v+=gs){const py=oY-(v-yMn)*sc;if(py>0&&py<H){ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(W,py);ctx.stroke();ctx.fillText(v.toFixed(0),4,py-4);}}
 const sbM=nS(rX/zoom),sbPx=sbM*sc;ctx.fillStyle=ac;ctx.fillRect(W-sbPx-20,H-16,sbPx,3);ctx.fillText(`${sbM} m`,W-sbPx-18,H-20);
-if(!isTop){[1.3,5,10,15,20,25,30].forEach(hv=>{if(hv>rY)return;const py=oY-hv*sc;if(py<0||py>H)return;ctx.strokeStyle=hv===1.3?"#f5920066":"#22d3ee22";ctx.lineWidth=hv===1.3?2:1;ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(W,py);ctx.stroke();ctx.fillStyle=hv===1.3?"#f59200":"#22d3ee66";ctx.font="12px monospace";ctx.fillText(`${hv}m`,W-40,py-3);});}
+if(!isTop){[1.3,5,10,15,20,25,30].forEach(hv=>{if(hv>rY)return;const py=oY-hv*sc;if(py<0||py>H)return;ctx.strokeStyle=hv===1.3?"#f5920066":"#22d3ee22";ctx.lineWidth=hv===1.3?2:1;ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(W,py);ctx.stroke();ctx.fillStyle=hv===1.3?"#f59200":"#22d3ee66";ctx.font="18px monospace";ctx.fillText(`${hv}m`,W-56,py-4);});}
 const mx=Math.floor(5e5*(ptPct/100)),st=aP.x.length>mx?Math.ceil(aP.x.length/mx):1;
 for(let i=0;i<aP.x.length;i+=st){const px=oX+(xA[i]-xMn)*sc,py=oY-(yA[i]-yMn)*sc;if(px<-5||px>W+5||py<-5||py>H+5)continue;
 if(sel!==null&&segs&&segs.labels[i]!==sel&&segs.labels[i]>0){ctx.fillStyle=theme==="dark"?"#151a22":"#e8e8e8";ctx.fillRect(px,py,ptSz*.7,ptSz*.7);continue;}
@@ -420,32 +420,40 @@ else if(cMode==="veglayer"&&aZ){const c=LAYER_COLOURS[layerOf(aZ[i],vT)];ctx.fil
 else{const t=aB.z1===aB.z0?.5:(aP.z[i]-aB.z0)/(aB.z1-aB.z0);const[cr2,cg,cb]=hC(t);ctx.fillStyle=`rgb(${cr2*255|0},${cg*255|0},${cb*255|0})`;}
 ctx.fillRect(px,py,ptSz,ptSz);}
 if(!clp&&cc&&isTop){const cx2=oX+(cc.x-xMn)*sc,cy2=oY-(cc.y-yMn)*sc,r2=cr*sc;ctx.shadowColor="#00ffff";ctx.shadowBlur=12;ctx.strokeStyle="#00ffff";ctx.lineWidth=3;ctx.setLineDash([8,4]);ctx.beginPath();if(cs==="circle")ctx.arc(cx2,cy2,r2,0,Math.PI*2);else ctx.rect(cx2-r2,cy2-r2,r2*2,r2*2);ctx.stroke();ctx.setLineDash([]);ctx.shadowBlur=0;ctx.fillStyle="#00ffff";ctx.beginPath();ctx.arc(cx2,cy2,6,0,Math.PI*2);ctx.fill();ctx.font="bold 14px monospace";ctx.fillText(`r=${cr}m`,cx2+10,cy2-10);}
-if(tP1&&isTop){const ax=oX+(tP1.x-xMn)*sc,ay=oY-(tP1.y-yMn)*sc;ctx.fillStyle="#ff6384";ctx.beginPath();ctx.arc(ax,ay,6,0,Math.PI*2);ctx.fill();
-if(tP2){const bx=oX+(tP2.x-xMn)*sc,by=oY-(tP2.y-yMn)*sc;ctx.strokeStyle="#ff6384";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.stroke();ctx.fillStyle="#ff6384";ctx.beginPath();ctx.arc(bx,by,6,0,Math.PI*2);ctx.fill();const d=Math.sqrt((tP2.x-tP1.x)**2+(tP2.y-tP1.y)**2);ctx.font="bold 12px monospace";ctx.fillText(`${d.toFixed(1)}m`,(ax+bx)/2+8,(ay+by)/2-8);}}
+if(tP1&&isTop){const ax=oX+(tP1.x-xMn)*sc,ay=oY-(tP1.y-yMn)*sc;ctx.fillStyle="#ff6384";ctx.beginPath();ctx.arc(ax,ay,6,0,Math.PI*2);ctx.fill();ctx.font="bold 24px monospace";ctx.fillText("A",ax-26,ay-10);
+if(tP2){const bx=oX+(tP2.x-xMn)*sc,by=oY-(tP2.y-yMn)*sc;ctx.strokeStyle="#ff6384";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.stroke();ctx.fillStyle="#ff6384";ctx.beginPath();ctx.arc(bx,by,6,0,Math.PI*2);ctx.fill();ctx.font="bold 24px monospace";ctx.fillText("B",bx+10,by-10);const d=Math.sqrt((tP2.x-tP1.x)**2+(tP2.y-tP1.y)**2);ctx.font="bold 22px monospace";ctx.fillText(`${d.toFixed(1)} m`,(ax+bx)/2+8,(ay+by)/2-12);}}
 cv._tr={oX,oY,sc,xMn,yMn,W,H};};
 drawC(topR.current,true);drawC(sideR.current,false);
 // TRANSECT — ayrı sabit canvas, topR'den bağımsız
-const tc=transR.current;if(tc&&tData&&tData.length>0&&tc.offsetWidth>0){
+const tc=transR.current;if(tc&&tData&&tData.length>0&&tc.offsetWidth>0&&tc.offsetHeight>0){
 const ctx=tc.getContext("2d"),W=tc.width=tc.offsetWidth*2,H=tc.height=tc.offsetHeight*2;ctx.fillStyle=dk;ctx.fillRect(0,0,W,H);
-let mD2=0,mZ=0;for(const p of tData){if(p.dist>mD2)mD2=p.dist;if(p.zN>mZ)mZ=p.zN;}const pL=50,pRt=20,pT=20,pBt=25;
-const sx=(W-pL-pRt)/Math.max(mD2,1),sz=(H-pT-pBt)/Math.max(mZ,1);
-ctx.strokeStyle="#8B4513";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(pL,H-pBt);ctx.lineTo(W-pRt,H-pBt);ctx.stroke();
-for(let h=0;h<=mZ;h+=2){const y=H-pBt-h*sz;if(y<pT)continue;ctx.strokeStyle="#22d3ee15";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(pL,y);ctx.lineTo(W-pRt,y);ctx.stroke();ctx.fillStyle=txD;ctx.font="11px monospace";ctx.fillText(`${h}m`,5,y+4);}
+let mD2=0,mZ=0;for(const p of tData){if(p.dist>mD2)mD2=p.dist;if(p.zN>mZ)mZ=p.zN;}
+// margins in canvas pixels (2 x screen pixels): room for the height labels, the distance axis and the title
+const pL=84,pRt=64,pT=44,pBt=56,gx0=pL,gx1=W-pRt,gy0=H-pBt,gy1=pT;
+const sx=(gx1-gx0)/Math.max(mD2,1),sz=(gy0-gy1)/Math.max(mZ,1);
+ctx.font="20px monospace";ctx.lineWidth=1;
+const hs=nS(mZ);for(let h=0;h<=mZ+1e-9;h+=hs){const y=gy0-h*sz;ctx.strokeStyle=theme==="dark"?"#22d3ee18":"#0e749022";ctx.beginPath();ctx.moveTo(gx0,y);ctx.lineTo(gx1,y);ctx.stroke();ctx.fillStyle=txD;ctx.textAlign="right";ctx.fillText(`${+h.toFixed(1)} m`,gx0-8,y+7);}
+const ds=nS(mD2);for(let d=0;d<=mD2+1e-9;d+=ds){const x=gx0+d*sx;ctx.strokeStyle=theme==="dark"?"#22d3ee10":"#0e749018";ctx.beginPath();ctx.moveTo(x,gy0);ctx.lineTo(x,gy1);ctx.stroke();ctx.fillStyle=txD;ctx.textAlign="center";ctx.fillText(`${+d.toFixed(1)} m`,x,gy0+26);}
+ctx.textAlign="left";ctx.fillStyle="#ff6384";ctx.font="bold 24px monospace";ctx.fillText("A",gx0-4,gy0+50);ctx.textAlign="right";ctx.fillText("B",gx1+4,gy0+50);ctx.textAlign="left";
+ctx.strokeStyle="#8B4513";ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(gx0,gy0);ctx.lineTo(gx1,gy0);ctx.stroke();
 const binSz=0.5,bins=new Map();for(const p of tData){const k=Math.floor(p.dist/binSz);if(!bins.has(k)||p.zN>bins.get(k).zN)bins.set(k,p);}
 const sorted=[...bins.values()].sort((a,b2)=>a.dist-b2.dist);
-ctx.beginPath();ctx.moveTo(pL,H-pBt);for(const p of sorted)ctx.lineTo(pL+p.dist*sx,H-pBt-p.zN*sz);ctx.lineTo(pL+mD2*sx,H-pBt);ctx.closePath();ctx.fillStyle="#22d3ee15";ctx.fill();
-ctx.beginPath();for(let i=0;i<sorted.length;i++){const x=pL+sorted[i].dist*sx,y=H-pBt-sorted[i].zN*sz;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);}ctx.strokeStyle="#22d3ee";ctx.lineWidth=1.5;ctx.stroke();
-for(const p of tData){const px=pL+p.dist*sx,py=H-pBt-p.zN*sz,t=mZ>0?p.zN/mZ:0;const[r,g,b2]=hC(t);ctx.fillStyle=`rgb(${r*255|0},${g*255|0},${b2*255|0})`;ctx.fillRect(px-1,py-1,2,2);}
-if(mZ>1.3){const y=H-pBt-1.3*sz;ctx.strokeStyle="#f5920055";ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(pL,y);ctx.lineTo(W-pRt,y);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle="#f59200";ctx.font="10px monospace";ctx.fillText("1.3m",W-pRt+2,y+4);}
-ctx.fillStyle=ac;ctx.font="bold 12px monospace";ctx.fillText(`Transect: ${mD2.toFixed(1)}m | Hmax: ${mZ.toFixed(1)}m | ${tData.length}pts`,pL,14);}
-},[aP,aB,aZ,cc,cr,cs,cMode,segs,ptSz,ptPct,clp,sel,pan,zoom,theme,dk,txD,tP1,tP2,tData,vT]);
+ctx.beginPath();ctx.moveTo(gx0,gy0);for(const p of sorted)ctx.lineTo(gx0+p.dist*sx,gy0-p.zN*sz);ctx.lineTo(gx0+mD2*sx,gy0);ctx.closePath();ctx.fillStyle="#22d3ee15";ctx.fill();
+ctx.beginPath();for(let i=0;i<sorted.length;i++){const x=gx0+sorted[i].dist*sx,y=gy0-sorted[i].zN*sz;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);}ctx.strokeStyle="#22d3ee";ctx.lineWidth=2;ctx.stroke();
+for(const p of tData){const px=gx0+p.dist*sx,py=gy0-p.zN*sz,t=mZ>0?p.zN/mZ:0;const[r,g,b2]=hC(t);ctx.fillStyle=`rgb(${r*255|0},${g*255|0},${b2*255|0})`;ctx.fillRect(px-1.5,py-1.5,3,3);}
+if(mZ>1.3){const y=gy0-1.3*sz;ctx.strokeStyle="#f59200aa";ctx.lineWidth=2;ctx.setLineDash([8,8]);ctx.beginPath();ctx.moveTo(gx0,y);ctx.lineTo(gx1,y);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle="#f59200";ctx.font="18px monospace";ctx.fillText("1.3 m",gx1+6,y+6);}
+ctx.fillStyle=ac;ctx.font="bold 22px monospace";ctx.fillText(L?`Kesit A→B: ${mD2.toFixed(1)} m | en yüksek ${mZ.toFixed(1)} m | ${tData.length} nokta | yükseklik: zeminden`:`Transect A→B: ${mD2.toFixed(1)} m | max ${mZ.toFixed(1)} m | ${tData.length} pts | height above ground`,gx0,28);}
+},[aP,aB,aZ,cc,cr,cs,cMode,segs,ptSz,ptPct,clp,sel,pan,zoom,theme,dk,txD,tP1,tP2,tData,vT,L,ac]);
 useEffect(()=>{if(view==="2d")draw2D();},[draw2D,view]);
-// Transect canvas, açılma animasyonu (height 0→160) bittikten sonra 0-yükseklikli
-// canvas'a çizildiği için ilk anda boş kalıyordu. Konteyner gerçek yüksekliğe
-// ulaşana kadar rAF ile bekleyip yeniden çiziyoruz (sekme değiştirme gerekmez).
-useEffect(()=>{if(view!=="2d"||!hasTrans)return;let raf,tries=0;
-const tick=()=>{const tc=transR.current;if(tc&&tc.offsetHeight>0){draw2D();return;}if(tries++<30)raf=requestAnimationFrame(tick);};
-raf=requestAnimationFrame(tick);return()=>cancelAnimationFrame(raf);},[hasTrans,tData,view,draw2D]);
+// Redraw the 2D canvases when their on-screen size changes (transect panel opening or
+// closing, window resize). A canvas keeps the resolution it was last drawn at, so without
+// this it was shown stretched; the transect used to be drawn while its panel was still
+// opening (22 px tall) and stayed blurred until the view was switched to 3D and back.
+useEffect(()=>{if(view!=="2d"||typeof ResizeObserver==="undefined")return;let raf=0;
+const stale=()=>[topR,sideR,transR].some(r=>{const c=r.current;return c&&c.offsetWidth>0&&c.offsetHeight>0&&(c.width!==c.offsetWidth*2||c.height!==c.offsetHeight*2);});
+const ro=new ResizeObserver(()=>{cancelAnimationFrame(raf);raf=requestAnimationFrame(()=>{if(stale())draw2D();});});
+[topR,sideR,transR].forEach(r=>r.current&&ro.observe(r.current));
+return()=>{ro.disconnect();cancelAnimationFrame(raf);};},[view,draw2D,hasTrans]);
 
 // --- 3D ---
 useEffect(()=>{if(view!=="3d"||!aP||!aB)return;const el=threeR.current;if(!el)return;if(cleanR.current){cleanR.current();cleanR.current=null;}
@@ -539,7 +547,7 @@ return(
 {segs&&<span title={L?"Ölçülen ağaç (≥5 nokta) / bulunan segment":"Measured trees (≥5 points) / detected segments"} style={{fontSize:9,color:gn2,background:gn2+"11",padding:"1px 5px",borderRadius:3}}>{met?`${met.length} / ${segs.count}`:segs.count} {L?"ağaç":"trees"}</span>}
 {msg&&<span style={{color:og}}>{msg}</span>}<div style={{flex:1}}/>
 <div style={{display:"flex",border:`1px solid ${bd}`,borderRadius:4,overflow:"hidden"}}><button style={{...BT(view==="2d"),borderRadius:0,border:"none",padding:"3px 12px"}} onClick={()=>setView("2d")}>2D</button><button style={{...BT(view==="3d"),borderRadius:0,border:"none",padding:"3px 12px",borderLeft:`1px solid ${bd}`}} onClick={()=>setView("3d")}>3D</button></div>
-<select style={IN} value={cMode} onChange={e=>{setCMode(e.target.value);if(e.target.value==="veglayer")setTab("tools");}}><option value="height">{L?"Yükseklik":"Height"}</option><option value="normalized">Normalize</option>{aP.hasRGB&&<option value="rgb">RGB</option>}<option value="intensity">{L?"Yoğunluk":"Intensity"}</option><option value="classification">{L?"Sınıf":"Classification"}</option><option value="veglayer">{L?"Vejetasyon katmanı":"Vegetation layers"}</option>{segs&&<option value="segment">Segment</option>}</select>
+<select style={{...IN,width:"auto",minWidth:104}} value={cMode} onChange={e=>{setCMode(e.target.value);if(e.target.value==="veglayer")setTab("tools");}}><option value="height">{L?"Yükseklik":"Height"}</option><option value="normalized">Normalize</option>{aP.hasRGB&&<option value="rgb">RGB</option>}<option value="intensity">{L?"Yoğunluk":"Intensity"}</option><option value="classification">{L?"Sınıf":"Classification"}</option><option value="veglayer">{L?"Vejetasyon katmanı":"Vegetation layers"}</option>{segs&&<option value="segment">Segment</option>}</select>
 <a href={`${FORA_REPO}/blob/main/docs/${L?"KILAVUZ":"MANUAL"}.md`} target="_blank" rel="noopener noreferrer" aria-label={L?"Kullanım kılavuzu":"User manual"} title={L?"Kullanım kılavuzu":"User manual"} style={{...BT(false),textDecoration:"none"}}>?</a>
 <button aria-label={L?"Tema değiştir":"Toggle theme"} title={L?"Tema değiştir":"Toggle theme"} style={BT(theme==="light")} onClick={()=>setTheme(t=>t==="dark"?"light":"dark")}>{theme==="dark"?"☀":"🌙"}</button>
 <div style={{display:"flex",border:`1px solid ${bd}`,borderRadius:4,overflow:"hidden"}}><button style={{...BT(L),borderRadius:0,border:"none",padding:"3px 8px"}} onClick={()=>setLang("TR")}>TR</button><button style={{...BT(!L),borderRadius:0,border:"none",padding:"3px 8px",borderLeft:`1px solid ${bd}`}} onClick={()=>setLang("EN")}>EN</button></div>
@@ -548,23 +556,35 @@ return(
 
 <div style={{flex:1,display:"flex",overflow:"hidden"}}>
 {/* CANVAS — topR ASLA boyut değiştirmez */}
-<div style={{flex:1,display:"flex",flexDirection:"column"}}>
-  {/* ANA GÖRÜNTÜ — sabit */}
-  <div style={{flex:1,display:"flex",position:"relative"}}>
+<div style={{flex:1,display:"flex",flexDirection:"column",minWidth:0,minHeight:0}}>
+  {/* ANA GÖRÜNTÜ — minHeight:0 lets it shrink when the transect panel opens */}
+  <div style={{flex:1,display:"flex",position:"relative",minHeight:0}}>
+    {/* colour legend: what the colours mean, in the units of the current colour mode */}
+    {aP&&aB&&(()=>{const box={position:"absolute",top:8,left:8,zIndex:5,background:dk+"e6",border:`1px solid ${bd}`,borderRadius:4,padding:"6px 8px",fontSize:10,color:txM,lineHeight:1.5,pointerEvents:"none",maxWidth:190};
+    const title=t=><div style={{color:tx,marginBottom:4,fontWeight:600}}>{t}</div>;
+    const grad=(t,top,mid,bot,cols)=>(<div style={box}>{title(t)}<div style={{display:"flex",gap:8}}><div style={{width:12,height:90,borderRadius:2,background:`linear-gradient(to top,${cols})`}}/><div style={{display:"flex",flexDirection:"column",justifyContent:"space-between",height:90}}><span>{top}</span><span>{mid}</span><span>{bot}</span></div></div></div>);
+    const sw=(rgb,label,k)=>(<div key={k} style={{display:"flex",alignItems:"center",gap:5}}><span style={{width:9,height:9,borderRadius:2,background:`rgb(${rgb.join(",")})`,display:"inline-block",flexShrink:0}}/>{label}</div>);
+    const HCG="rgb(0,0,255),rgb(0,255,0),rgb(255,0,0)";
+    if(cMode==="normalized"&&aZ)return grad(L?"Zeminden yükseklik":"Height above ground","≥ 30 m","15 m","0 m",HCG);
+    if(cMode==="intensity")return grad(L?"Yoğunluk (ham değer)":"Intensity (raw value)","≥ 255","128","0","rgb(0,0,0),rgb(255,255,255)");
+    if(cMode==="classification"&&lasInfo)return(<div style={box}>{title(L?"Sınıf (ASPRS)":"Class (ASPRS)")}{lasInfo.classes.slice(0,8).map(c=>sw(clsCol(c.code).map(v=>Math.round(v*255)),`${c.code} · ${c.label}`,c.code))}</div>);
+    if(cMode==="veglayer"&&aZ)return(<div style={box}>{title(L?"Vejetasyon katmanı":"Vegetation layer")}{[[0,L?`Zemin / diğer (< ${vg} m)`:`Ground / other (< ${vg} m)`],[1,L?`Düşük (${vg}–${vl} m)`:`Low (${vg}–${vl} m)`],[2,L?`Orta (${vl}–${vm} m)`:`Medium (${vl}–${vm} m)`],[3,L?`Yüksek (> ${vm} m)`:`High (> ${vm} m)`]].map(([k,lab])=>sw(LAYER_COLOURS[k],lab,k))}</div>);
+    if(cMode==="segment"||(cMode==="rgb"&&aP.hasRGB))return null;
+    return grad(L?"Rakım (dosyadaki Z)":"Elevation (file Z)",`${aB.z1.toFixed(1)} m`,`${((aB.z0+aB.z1)/2).toFixed(1)} m`,`${aB.z0.toFixed(1)} m`,HCG);})()}
     {view==="2d"?(<>
-      <div style={{flex:2,position:"relative"}}>
-        <canvas ref={topR} style={{width:"100%",height:"100%",cursor:tMode?"crosshair":"grab",display:"block"}}
+      <div style={{flex:2,position:"relative",minWidth:0,minHeight:0}}>
+        <canvas ref={topR} style={{position:"absolute",left:0,top:0,width:"100%",height:"100%",cursor:tMode?"crosshair":"grab",display:"block"}}
           onMouseDown={e=>handleMouse(e,"down")} onMouseMove={e=>handleMouse(e,"move")}
           onMouseUp={e=>handleMouse(e,"up")} onMouseLeave={e=>{dragR.current.on=false;dragR.current.moved=false;}}
           onWheel={e=>handleMouse(e,"wheel")}/>
         <div style={{position:"absolute",bottom:6,left:6,fontSize:9,color:txD,background:dk+"cc",padding:"2px 6px",borderRadius:3}}>
           {tMode?(L?"Transect: 2 nokta":"Click 2 pts"):!clp&&zN?(L?"Tıkla→merkez | Sürükle→kaydır":"Click→center | Drag→pan"):(L?"Sürükle→kaydır":"Drag→pan")}</div>
       </div>
-      <div style={{flex:1,borderLeft:`1px solid ${bd}`}}><canvas ref={sideR} style={{width:"100%",height:"100%",display:"block"}}/></div>
+      <div style={{flex:1,borderLeft:`1px solid ${bd}`,position:"relative",minWidth:0,minHeight:0}}><canvas ref={sideR} style={{position:"absolute",left:0,top:0,width:"100%",height:"100%",display:"block"}}/></div>
     </>):(<div ref={threeR} style={{flex:1}}/>)}
   </div>
   {/* TRANSECT — SADECE 2D, her zaman DOM'da, veri yoksa height:0 */}
-  {view==="2d"&&<div style={{height:hasTrans?160:0,overflow:"hidden",borderTop:hasTrans?"2px solid #ff6384":"none",flexShrink:0,transition:"height 0.2s"}}>
+  {view==="2d"&&<div style={{height:hasTrans?210:0,overflow:"hidden",borderTop:hasTrans?"2px solid #ff6384":"none",flexShrink:0}}>
     <canvas ref={transR} style={{width:"100%",height:"100%",display:"block"}}
       onMouseDown={e=>e.stopPropagation()} onMouseMove={e=>e.stopPropagation()} onWheel={e=>e.stopPropagation()}/>
   </div>}
