@@ -16,7 +16,7 @@ Status: ✅ done (on the development branch, not yet released) · 🔧 in progre
 | ✅ | `npm test` failed on Node.js 22 and later | Script changed to `node --test`; verified on Node 20 (CI) and 22. |
 | ✅ | Tests for the v1.9 modules | Carbon, vegetation layers, LAS info, PDF text, LAZ round-trip against LAS (new fixtures in `test_data/`). |
 | ✅ | Citation box | Adds the BibTeX entry of the SoftwareX article. |
-| ⏳ | `npm audit` advisories | All seven are in development tools only (Vite dev server, PostCSS, Browserslist), not in the published site. Non-breaking updates first; the Vite major upgrade is in v1.11. |
+| ✅ | `npm audit` advisories (5 of 7) | All seven were in development tools only, not in the published site. Five cleared with non-breaking updates (only versions at least two weeks old); the remaining two need the Vite major upgrade in v1.11. |
 
 ## v1.10 — usability
 

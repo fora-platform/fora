@@ -23,6 +23,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The citation box includes the BibTeX entry of the SoftwareX article.
 - ROADMAP.md with the planned work.
 
+### Security
+
+- Updated development dependencies (Browserslist, PostCSS, nanoid,
+  source-map-js, baseline-browser-mapping) to clear five of the seven `npm audit`
+  advisories. None of them affected the published site, which is built to static
+  files. Only versions published at least two weeks earlier were accepted. The two
+  remaining advisories concern the Vite development server and need a major Vite
+  upgrade, planned for v1.11.
+- The lockfile now records the package version (it still read 1.8.0).
+
 ## [1.9.0] - 2026-11-03
 
 ### Added
