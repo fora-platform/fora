@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)](https://reactjs.org/)
 [![Three.js](https://img.shields.io/badge/Three.js-r128-000000?logo=three.js)](https://threejs.org/)
-[![Version](https://img.shields.io/badge/version-1.9.1-brightgreen.svg)](https://github.com/fora-platform/fora/releases)
+[![Version](https://img.shields.io/badge/version-1.9.2-brightgreen.svg)](https://github.com/fora-platform/fora/releases)
 
 **FORA** is an open-source, browser-based platform for processing forest LiDAR point clouds at the individual-tree and stand levels. All computation runs entirely on the client side — no installation, no server, no programming knowledge required, and point cloud data never leaves the user's device.
 

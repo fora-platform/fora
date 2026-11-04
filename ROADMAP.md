@@ -18,7 +18,7 @@ Status: ✅ done · 🔧 in progress · ⏳ planned · 🔬 needs a scientific d
 | ✅ | Citation box | Adds the BibTeX entry of the SoftwareX article. |
 | ✅ | `npm audit` advisories (5 of 7) | All seven were in development tools only, not in the published site. Five cleared with non-breaking updates (only versions at least two weeks old); the remaining two need the Vite major upgrade in v1.11. |
 
-## v1.9.2 — display fixes
+## v1.9.2 — display fixes · released 2026-11-04
 
 | | Item | Notes |
 |---|---|---|

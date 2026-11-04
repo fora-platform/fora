@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: "If you use FORA, please cite it as below."
 title: "FORA: An Open-Source Browser-Based Platform for Processing UAV-LiDAR Point Clouds in Forest Structures"
-version: 1.9.1
+version: 1.9.2
 date-released: 2026-11-04
 license: MIT
 repository-code: "https://github.com/fora-platform/fora"

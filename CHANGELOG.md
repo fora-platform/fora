@@ -5,7 +5,7 @@ All notable changes to FORA will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.9.2] - 2026-11-04
 
 ### Fixed
 
@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   height above ground, intensity, ASPRS classes and vegetation layers.
 - Transect: distance axis, height axis with even steps, A and B end labels on the
   map and on the profile, and a title stating that heights are above ground.
+
+### Changed
+
+- Version reported in the interface, package.json, CITATION.cff and README
+  aligned at 1.9.2.
 
 ## [1.9.1] - 2026-11-04
 
