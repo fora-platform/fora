@@ -4,11 +4,11 @@ Planned work after v1.9.0, grouped by release. Each item is developed on its own
 branch, tested locally (`npm test`, `npm run build`, `npm run preview`), merged through
 a pull request, and listed in [CHANGELOG.md](CHANGELOG.md) when released.
 
-Status: ✅ done (on the development branch, not yet released) · 🔧 in progress · ⏳ planned · 🔬 needs a scientific decision
+Status: ✅ done · 🔧 in progress · ⏳ planned · 🔬 needs a scientific decision
 
 ---
 
-## v1.9.1 — bug fixes
+## v1.9.1 — bug fixes · released 2026-11-04
 
 | | Item | Notes |
 |---|---|---|

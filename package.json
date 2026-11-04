@@ -1,6 +1,6 @@
 {
   "name": "fora",
-  "version": "1.9.0",
+  "version": "1.9.1",
   "description": "FORA — An Open-Source browser-based platform for UAV-LiDAR forest point cloud analysis",
   "type": "module",
   "scripts": {

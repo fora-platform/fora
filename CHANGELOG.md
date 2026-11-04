@@ -5,7 +5,7 @@ All notable changes to FORA will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.9.1] - 2026-11-04
 
 ### Fixed
 
@@ -32,6 +32,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   remaining advisories concern the Vite development server and need a major Vite
   upgrade, planned for v1.11.
 - The lockfile now records the package version (it still read 1.8.0).
+
+### Changed
+
+- Version reported in the interface, package.json, CITATION.cff and README
+  aligned at 1.9.1.
 
 ## [1.9.0] - 2026-11-03
 
