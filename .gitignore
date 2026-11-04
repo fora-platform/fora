@@ -43,6 +43,6 @@ sample_data/
 
 # except the small LAS test files shipped with the release
 !test_data/*.las
-
+!test_data/*.laz
 # OS
 .Trash/
