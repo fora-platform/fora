@@ -32,6 +32,7 @@ Status: ✅ done · 🔧 in progress · ⏳ planned · 🔬 needs a scientific d
 
 | | Item | Notes |
 |---|---|---|
+| ⏳ | Warn when coordinates are in degrees | Photogrammetry exports (e.g. Agisoft Metashape) often keep WGS 84 latitude/longitude while Z is in metres: the cloud then appears as a single vertical line in 3D, the extent reads 0 × 0 m and segmentation fails. Detect a near-zero horizontal extent with a normal height range and ask for a projected CRS in metres (e.g. UTM); automatic conversion can follow once EPSG is read (v1.11). |
 | ⏳ | Metrics table pagination | The table lists only the first 200 trees. |
 | ⏳ | Keep field measurements when segmentation is re-run | H₂, CD₂ and DBH₂ are currently erased; match old and new trees by position. |
 | ⏳ | Apply an external DTM to the loaded file | Today it only takes effect on the next file load. |
