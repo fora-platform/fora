@@ -5,7 +5,7 @@ All notable changes to FORA will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.9.3] - 2026-11-13
 
 ### Added
 
@@ -28,12 +28,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   view changes, which lowers GPU load while idle.
 - The 3D view keeps its position when the colour mode or point size changes; it
   is reset when a new file is loaded or an area is clipped.
+- Version reported in the interface, package.json, CITATION.cff and README
+  aligned at 1.9.3.
 
 ### Fixed
 
 - Side view: the 1.3 m, 5 m … reference lines were measured from the lowest point
   of the file, not from the ground, which was misleading on slopes. They are now
   drawn in the height-above-ground view only, where they are correct.
+
+### Documentation
+
+- Manual (Turkish and English): 3D navigation, coordinate axes and the vertical
+  axis choice.
 
 ## [1.9.2] - 2026-11-04
 

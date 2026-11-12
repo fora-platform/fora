@@ -28,7 +28,7 @@ Status: ✅ done · 🔧 in progress · ⏳ planned · 🔬 needs a scientific d
 | ✅ | Transect axes | Distance and height ticks, A/B end labels. |
 | ✅ | Colour-mode menu too narrow | |
 
-## v1.9.3 — 3D navigation and real coordinates
+## v1.9.3 — 3D navigation and real coordinates · released 2026-11-13
 
 | | Item | Notes |
 |---|---|---|

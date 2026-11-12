@@ -284,7 +284,7 @@ const spName=(s,L)=>s?(L?s.nameTR:s.nameEN):"";
 function dlF(blob,name){const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(url),1000);}
 
 // --- citation ---
-const FORA_VERSION="1.9.2";
+const FORA_VERSION="1.9.3";
 const FORA_DOI="10.5281/zenodo.19546162";
 const FORA_REPO="https://github.com/fora-platform/fora";
 const FORA_PAPER_DOI="10.1016/j.softx.2026.102927";
