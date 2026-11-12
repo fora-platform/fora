@@ -28,18 +28,31 @@ Status: ✅ done · 🔧 in progress · ⏳ planned · 🔬 needs a scientific d
 | ✅ | Transect axes | Distance and height ticks, A/B end labels. |
 | ✅ | Colour-mode menu too narrow | |
 
+## v1.9.3 — 3D navigation and real coordinates
+
+| | Item | Notes |
+|---|---|---|
+| ✅ | Pan in 3D | Right or middle button, Shift+drag, or a pan-mode button for touchpads; the view could only be rotated and zoomed around a fixed centre. |
+| ✅ | Zoom to the cursor | The wheel zooms toward the point under the cursor instead of the centre. |
+| ✅ | Touch control in 3D | One finger rotates, two fingers pan and pinch-zoom (tablets, touch screens). |
+| ✅ | Reset and top view buttons | Top view looks straight down with north up. |
+| ✅ | Coordinate axes in 3D | Ground grid at round easting/northing values with labels, elevation axis, north arrow; can be hidden. |
+| ✅ | Real coordinates in 2D | Grid labels show easting/northing instead of offsets from the first point; cursor position read-out. |
+| ✅ | Vertical axis: height above ground or elevation | 3D and side view; height above ground by default, so tree heights are read directly from the axis. |
+| ✅ | Side view height lines | Were measured from the lowest point of the file; now shown only above the ground, where they are correct. |
+| ✅ | 3D view follows window resizes; draws only when the view changes | Lower GPU load while idle. |
+
 ## v1.10 — usability
 
 | | Item | Notes |
 |---|---|---|
 | ⏳ | Warn when coordinates are in degrees | Photogrammetry exports (e.g. Agisoft Metashape) often keep WGS 84 latitude/longitude while Z is in metres: the cloud then appears as a single vertical line in 3D, the extent reads 0 × 0 m and segmentation fails. Detect a near-zero horizontal extent with a normal height range and ask for a projected CRS in metres (e.g. UTM); automatic conversion can follow once EPSG is read (v1.11). |
+| ⏳ | Coordinate system: read, warn, choose | Read the CRS from the file (GeoKey directory in LAS 1.2–1.3, WKT in LAS 1.4) and show it. When the file has none, say so and let the user pick one (common list for Türkiye and Europe: WGS 84 / UTM, TUREF / TM, ED50 / UTM) or type an EPSG code. Prerequisite for the background maps in v1.11. |
 | ⏳ | Metrics table pagination | The table lists only the first 200 trees. |
 | ⏳ | Keep field measurements when segmentation is re-run | H₂, CD₂ and DBH₂ are currently erased; match old and new trees by position. |
 | ⏳ | Apply an external DTM to the loaded file | Today it only takes effect on the next file load. |
 | ⏳ | CSV for spreadsheets with a decimal comma | Optional `;`-separated export. |
 | ⏳ | Intensity colour mode | Values are clipped at 255; most sensors store 0–65535, so clouds can look uniformly white. Scale to the file's own range. |
-| ⏳ | Side view height lines | The 1.3 m, 5 m … lines are measured from the lowest point of the file, not from the ground; misleading on slopes. |
-| ⏳ | 3D scale | A height scale or axis labels in the 3D view, beyond the colour legend. |
 | 🔬 | Valid height range for every DBH model | Out-of-range warning already exists for models that return no value; ranges are needed for stone pine, beech and Turkey oak, whose models saturate instead. |
 | 🔬 | Carbon root-to-shoot ratio | Options: IPCC 2006 Table 4.4 by above-ground biomass per hectare, or measured Turkish values (e.g. Durkaya et al. 2020). |
 
@@ -47,7 +60,7 @@ Status: ✅ done · 🔧 in progress · ⏳ planned · 🔬 needs a scientific d
 
 | | Item | Notes |
 |---|---|---|
-| ⏳ | Read the coordinate system (EPSG) from LAS files | GeoKey directory (LAS 1.2–1.3) and WKT (LAS 1.4). |
+| ⏳ | Background under the cloud, user's choice | 2D map background and textured ground in 3D. Options: none (default) · satellite image (online) · street map (online) · own orthophoto (GeoTIFF, e.g. from Agisoft Metashape or Pix4D; offline). Online options need the CRS and a reprojection library; requesting tiles tells the tile server where the area is, so the user is told this once before turning them on. Tile-service terms and attribution to be checked. |
 | ⏳ | Decompress LAZ in a Web Worker | Large files currently freeze the page for a few seconds. |
 | ⏳ | Turkish PDF report | Needs an embedded font. |
 | ⏳ | Upgrade Vite | Clears the remaining development-server advisories. |
