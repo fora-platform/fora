@@ -5,6 +5,43 @@ All notable changes to FORA will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.3] - 2026-11-13
+
+### Added
+
+- 3D navigation: pan with the right or middle mouse button, Shift+drag, or the
+  new pan-mode button (for touchpads); the wheel zooms toward the point under the
+  cursor; on touch screens one finger rotates and two fingers pan and pinch-zoom.
+  Buttons to reset the view and to look from above with north up.
+- Coordinate axes in 3D: a ground grid at round easting and northing values with
+  labels, an elevation axis and a north arrow. They can be hidden.
+- 2D: grid labels show the file's real easting and northing (previously offsets
+  from the first point), and a read-out shows the coordinates under the cursor.
+- Vertical axis choice for the 3D view and the side view: height above ground
+  (default when heights are normalised; the terrain is flattened, so tree heights
+  can be read from the axis) or the file's elevation. In the height-above-ground
+  view, points without a ground estimate are not shown.
+
+### Changed
+
+- The 3D view follows changes of the window size and is redrawn only when the
+  view changes, which lowers GPU load while idle.
+- The 3D view keeps its position when the colour mode or point size changes; it
+  is reset when a new file is loaded or an area is clipped.
+- Version reported in the interface, package.json, CITATION.cff and README
+  aligned at 1.9.3.
+
+### Fixed
+
+- Side view: the 1.3 m, 5 m … reference lines were measured from the lowest point
+  of the file, not from the ground, which was misleading on slopes. They are now
+  drawn in the height-above-ground view only, where they are correct.
+
+### Documentation
+
+- Manual (Turkish and English): 3D navigation, coordinate axes and the vertical
+  axis choice.
+
 ## [1.9.2] - 2026-11-04
 
 ### Fixed

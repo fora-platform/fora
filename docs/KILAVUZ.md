@@ -98,7 +98,14 @@ DTM'in yüksekliği LAS'la 50 m'den fazla uyuşmazsa FORA DTM'i kullanmaz, otoma
 
 ## 3. Bak: 2D, 3D ve renkler
 
-- **2D** üstten haritadır (açılışta bu görünür). **3D** ise döndürülebilir, yakınlaştırılabilir görünümdür.
+- **2D** üstten haritadır (açılışta bu görünür). Izgara yazıları dosyanın gerçek doğu/kuzey koordinatlarıdır; fareyi gezdirince alt ortada imlecin koordinatı görünür.
+- **3D** üç boyutlu görünümdür:
+  - **Sol tık + sürükle:** döndürür.
+  - **Sağ tık, orta tuş (tekerlek basılı) veya Shift + sürükle:** görünümü kaydırır.
+  - **Tekerlek:** imlecin olduğu yere yakınlaşır.
+  - **Dokunmatik ekran:** tek parmak döndürür, iki parmak kaydırır ve yakınlaştırır.
+  - Sağ üstteki düğmeler: **⟲ Sıfırla** (başlangıç görünümü), **⊤ Üstten** (yukarıdan, kuzey yukarıda), **✋ Kaydır** (açıkken sol tık da kaydırır; orta tuşu olmayan dokunmatik yüzeyler için), **# Eksenler** (koordinat ızgarası, doğu/kuzey ve yükseklik ekseni, kuzey oku) ve **⇕** (dikey eksen).
+- **Dikey eksen** (3D ve 2D yan görünüm; ayrıca Araç → Görüntü): **Zeminden yükseklik** varsayılandır; arazi düzleştirilir, ağaç boyları eksenden okunur. **Rakım** dosyadaki gerçek yüksekliği gösterir. Zemin yüksekliği bilinmeyen noktalar (harici DTM'in dışında kalanlar) zeminden yükseklik görünümünde gösterilmez.
 - **Renk modları:**
   - Yükseklik
   - Normalize (zeminden yükseklik)

@@ -284,7 +284,7 @@ const spName=(s,L)=>s?(L?s.nameTR:s.nameEN):"";
 function dlF(blob,name){const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(url),1000);}
 
 // --- citation ---
-const FORA_VERSION="1.9.2";
+const FORA_VERSION="1.9.3";
 const FORA_DOI="10.5281/zenodo.19546162";
 const FORA_REPO="https://github.com/fora-platform/fora";
 const FORA_PAPER_DOI="10.1016/j.softx.2026.102927";
@@ -325,7 +325,11 @@ const dragR=useRef({on:false,moved:false,sx:0,sy:0,px:0,py:0});
 const dR=useRef(),zR=useRef(),cR=useRef(),czR=useRef(),mR=useRef();
 dR.current=data;zR.current=zN;cR.current=clp;czR.current=clpZ;mR.current=met;
 const cam3D=useRef({theta:Math.PI/4,phi:Math.PI/3.2,dist:0});
+// 3D navigation: reset/top-view callbacks set by the 3D effect; pan mode for trackpads and touch; labelled axes
+const ctl3D=useRef(null),coordR=useRef(null),pan3DR=useRef(false);const[pan3D,setPan3D]=useState(false),[axes3D,setAxes3D]=useState(true),[zView,setZView]=useState("ground");pan3DR.current=pan3D;
 const aP=clp||data,aZ=clpZ||zN,aB=clp?clpB:bnd,L=lang==="TR";
+// vertical axis of the 3D view and the side view: height above ground (default, needs normalised heights) or file elevation
+const zH=zView==="ground"&&!!aZ;const nzMax=useMemo(()=>{let m=0;if(aZ)for(let i=0;i<aZ.length;i++){const v=aZ[i];if(v>m)m=v;}return m;},[aZ]);
 // vegetation layers: thresholds must be increasing, otherwise the defaults are used (and the panel says so)
 const vgN=parseFloat(vegThr.g),vlN=parseFloat(vegThr.l),vmN=parseFloat(vegThr.m),vOk=vgN>=0&&vlN>vgN&&vmN>vlN;
 const vg=vOk?vgN:VEG_THRESHOLDS.groundMax,vl=vOk?vlN:VEG_THRESHOLDS.lowMax,vm=vOk?vmN:VEG_THRESHOLDS.mediumMax;
@@ -401,13 +405,16 @@ const cSt=useCallback(pairs=>{if(!pairs||pairs.length<3)return null;const n=pair
 // --- draw 2D (topR size stays fixed) ---
 const draw2D=useCallback(()=>{if(!aP||!aB)return;
 const drawC=(cv,isTop)=>{if(!cv||!cv.offsetWidth)return;const ctx=cv.getContext("2d");const W=cv.width=cv.offsetWidth*2,H=cv.height=cv.offsetHeight*2;ctx.fillStyle=dk;ctx.fillRect(0,0,W,H);
-const xA=aP.x,yA=isTop?aP.y:aP.z,xMn=aB.x0,xMx=aB.x1,yMn=isTop?aB.y0:aB.z0,yMx=isTop?aB.y1:aB.z1,rX=xMx-xMn||1,rY=yMx-yMn||1,bsc=Math.min((W-50)/rX,(H-50)/rY),sc=bsc*zoom;
+const xA=aP.x,yA=isTop?aP.y:(zH?aZ:aP.z),xMn=aB.x0,xMx=aB.x1,yMn=isTop?aB.y0:(zH?0:aB.z0),yMx=isTop?aB.y1:(zH?nzMax:aB.z1),rX=xMx-xMn||1,rY=yMx-yMn||1,bsc=Math.min((W-50)/rX,(H-50)/rY),sc=bsc*zoom;
 const oX=W/2-((xMn+xMx)/2-xMn)*sc+(isTop?pan.x*2:0),oY=H/2+((yMn+yMx)/2-yMn)*sc-(isTop?pan.y*2:0);
 ctx.strokeStyle=theme==="dark"?"#151a22":"#e5e5e5";ctx.lineWidth=1;const gs=nS(rX/zoom);ctx.font="20px monospace";ctx.fillStyle=txD;
-for(let v=Math.floor(xMn/gs)*gs;v<=xMx;v+=gs){const px=oX+(v-xMn)*sc;if(px>0&&px<W){ctx.beginPath();ctx.moveTo(px,0);ctx.lineTo(px,H);ctx.stroke();ctx.fillText(v.toFixed(0),px+2,H-4);}}
-for(let v=Math.floor(yMn/gs)*gs;v<=yMx;v+=gs){const py=oY-(v-yMn)*sc;if(py>0&&py<H){ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(W,py);ctx.stroke();ctx.fillText(v.toFixed(0),4,py-4);}}
+// grid lines at round values of the real (file) coordinates; labels show easting / northing (elevation in the side view)
+const xO=aP.ox||0,yO=isTop?(aP.oy||0):0,gdec=Math.max(0,-Math.floor(Math.log10(gs)+1e-9));
+for(let v=Math.floor((xMn+xO)/gs)*gs-xO;v<=xMx;v+=gs){const px=oX+(v-xMn)*sc;if(px>0&&px<W){ctx.beginPath();ctx.moveTo(px,0);ctx.lineTo(px,H);ctx.stroke();ctx.fillText((v+xO).toFixed(gdec),px+2,H-4);}}
+for(let v=Math.floor((yMn+yO)/gs)*gs-yO;v<=yMx;v+=gs){const py=oY-(v-yMn)*sc;if(py>0&&py<H){ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(W,py);ctx.stroke();ctx.fillText((v+yO).toFixed(gdec),4,py-4);}}
 const sbM=nS(rX/zoom),sbPx=sbM*sc;ctx.fillStyle=ac;ctx.fillRect(W-sbPx-20,H-16,sbPx,3);ctx.fillText(`${sbM} m`,W-sbPx-18,H-20);
-if(!isTop){[1.3,5,10,15,20,25,30].forEach(hv=>{if(hv>rY)return;const py=oY-hv*sc;if(py<0||py>H)return;ctx.strokeStyle=hv===1.3?"#f5920066":"#22d3ee22";ctx.lineWidth=hv===1.3?2:1;ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(W,py);ctx.stroke();ctx.fillStyle=hv===1.3?"#f59200":"#22d3ee66";ctx.font="18px monospace";ctx.fillText(`${hv}m`,W-56,py-4);});}
+// reference heights are only meaningful above the ground, so they are drawn in that view only
+if(!isTop&&zH){[1.3,5,10,15,20,25,30].forEach(hv=>{if(hv>rY)return;const py=oY-hv*sc;if(py<0||py>H)return;ctx.strokeStyle=hv===1.3?"#f5920066":"#22d3ee22";ctx.lineWidth=hv===1.3?2:1;ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(W,py);ctx.stroke();ctx.fillStyle=hv===1.3?"#f59200":"#22d3ee66";ctx.font="18px monospace";ctx.fillText(`${hv}m`,W-56,py-4);});}
 const mx=Math.floor(5e5*(ptPct/100)),st=aP.x.length>mx?Math.ceil(aP.x.length/mx):1;
 for(let i=0;i<aP.x.length;i+=st){const px=oX+(xA[i]-xMn)*sc,py=oY-(yA[i]-yMn)*sc;if(px<-5||px>W+5||py<-5||py>H+5)continue;
 if(sel!==null&&segs&&segs.labels[i]!==sel&&segs.labels[i]>0){ctx.fillStyle=theme==="dark"?"#151a22":"#e8e8e8";ctx.fillRect(px,py,ptSz*.7,ptSz*.7);continue;}
@@ -443,7 +450,7 @@ ctx.beginPath();for(let i=0;i<sorted.length;i++){const x=gx0+sorted[i].dist*sx,y
 for(const p of tData){const px=gx0+p.dist*sx,py=gy0-p.zN*sz,t=mZ>0?p.zN/mZ:0;const[r,g,b2]=hC(t);ctx.fillStyle=`rgb(${r*255|0},${g*255|0},${b2*255|0})`;ctx.fillRect(px-1.5,py-1.5,3,3);}
 if(mZ>1.3){const y=gy0-1.3*sz;ctx.strokeStyle="#f59200aa";ctx.lineWidth=2;ctx.setLineDash([8,8]);ctx.beginPath();ctx.moveTo(gx0,y);ctx.lineTo(gx1,y);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle="#f59200";ctx.font="18px monospace";ctx.fillText("1.3 m",gx1+6,y+6);}
 ctx.fillStyle=ac;ctx.font="bold 22px monospace";ctx.fillText(L?`Kesit A→B: ${mD2.toFixed(1)} m | en yüksek ${mZ.toFixed(1)} m | ${tData.length} nokta | yükseklik: zeminden`:`Transect A→B: ${mD2.toFixed(1)} m | max ${mZ.toFixed(1)} m | ${tData.length} pts | height above ground`,gx0,28);}
-},[aP,aB,aZ,cc,cr,cs,cMode,segs,ptSz,ptPct,clp,sel,pan,zoom,theme,dk,txD,tP1,tP2,tData,vT,L,ac]);
+},[aP,aB,aZ,cc,cr,cs,cMode,segs,ptSz,ptPct,clp,sel,pan,zoom,theme,dk,txD,tP1,tP2,tData,vT,L,ac,zH,nzMax]);
 useEffect(()=>{if(view==="2d")draw2D();},[draw2D,view]);
 // Redraw the 2D canvases when their on-screen size changes (transect panel opening or
 // closing, window resize). A canvas keeps the resolution it was last drawn at, so without
@@ -459,11 +466,16 @@ return()=>{ro.disconnect();cancelAnimationFrame(raf);};},[view,draw2D,hasTrans])
 useEffect(()=>{if(view!=="3d"||!aP||!aB)return;const el=threeR.current;if(!el)return;if(cleanR.current){cleanR.current();cleanR.current=null;}
 const W=el.offsetWidth,H=el.offsetHeight;if(!W||!H)return;const scene=new THREE.Scene();scene.background=new THREE.Color(theme==="dark"?0x080b10:0xf0f0f0);
 const cam=new THREE.PerspectiveCamera(55,W/H,.1,1e4);const ren=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});ren.setSize(W,H);el.appendChild(ren.domElement);
-const cx=(aB.x0+aB.x1)/2,cy=(aB.y0+aB.y1)/2,cz=(aB.z0+aB.z1)/2,range=Math.max(aB.x1-aB.x0,aB.y1-aB.y0,aB.z1-aB.z0)||10;
-if(cam3D.current.dist===0)cam3D.current.dist=range*1.1;let{theta,phi,dist}=cam3D.current;
+const zLo=zH?0:aB.z0,zHi=zH?nzMax:aB.z1,cx=(aB.x0+aB.x1)/2,cy=(aB.y0+aB.y1)/2,cz=(zLo+zHi)/2,range=Math.max(aB.x1-aB.x0,aB.y1-aB.y0,zHi-zLo)||10;
+// the camera orbits a target point that can be moved (pan); the view is kept across colour or size
+// changes and reset when a new file is loaded or the working area changes (clip)
+const bKey=`${aB.x0},${aB.x1},${aB.y0},${aB.y1},${aB.z0},${aB.z1}`;
+if(cam3D.current.dist===0||cam3D.current.key!==bKey)cam3D.current={theta:Math.PI/4,phi:Math.PI/3.2,dist:range*1.6,tx:0,ty:0,tz:0,key:bKey};
+let{theta,phi,dist}=cam3D.current;const tgt=new THREE.Vector3(cam3D.current.tx||0,cam3D.current.ty||0,cam3D.current.tz||0);
 const mP=Math.floor(8e5*(ptPct/100)),st=aP.x.length>mP?Math.ceil(aP.x.length/mP):1,cnt=Math.ceil(aP.x.length/st);
 const pos=new Float32Array(cnt*3),col=new Float32Array(cnt*3);let j=0;const selV=sel;
-for(let i=0;i<aP.x.length&&j<cnt;i+=st){pos[j*3]=aP.x[i]-cx;pos[j*3+1]=aP.z[i]-cz;pos[j*3+2]=-(aP.y[i]-cy);
+for(let i=0;i<aP.x.length&&j<cnt;i+=st){if(zH&&!(aZ[i]>-1e9))continue; // no ground estimate: not shown in the height-above-ground view
+pos[j*3]=aP.x[i]-cx;pos[j*3+1]=(zH?aZ[i]:aP.z[i])-cz;pos[j*3+2]=-(aP.y[i]-cy);
 const isSel=selV===null||!segs||segs.labels[i]===selV||segs.labels[i]<=0;
 if(!isSel){col[j*3]=.05;col[j*3+1]=.05;col[j*3+2]=.07;j++;continue;}
 if(cMode==="rgb"&&aP.hasRGB){col[j*3]=aP.r[i]/255;col[j*3+1]=aP.g[i]/255;col[j*3+2]=aP.b[i]/255;}
@@ -473,23 +485,72 @@ else if(cMode==="intensity"){const v=Math.min(1,aP.intensity[i]/255);col[j*3]=v;
 else if(cMode==="classification"){const[r2,g2,b3]=clsCol(aP.classification[i]);col[j*3]=r2;col[j*3+1]=g2;col[j*3+2]=b3;}
 else if(cMode==="veglayer"&&aZ){const c=LAYER_COLOURS[layerOf(aZ[i],vT)];col[j*3]=c[0]/255;col[j*3+1]=c[1]/255;col[j*3+2]=c[2]/255;}
 else{const t=aB.z1===aB.z0?.5:(aP.z[i]-aB.z0)/(aB.z1-aB.z0);const[r,g,b2]=hC(t);col[j*3]=r;col[j*3+1]=g;col[j*3+2]=b2;}j++;}
-const geom=new THREE.BufferGeometry();geom.setAttribute("position",new THREE.BufferAttribute(pos,3));geom.setAttribute("color",new THREE.BufferAttribute(col,3));
+const geom=new THREE.BufferGeometry();geom.setAttribute("position",new THREE.BufferAttribute(pos.subarray(0,j*3),3));geom.setAttribute("color",new THREE.BufferAttribute(col.subarray(0,j*3),3));
 const mat=new THREE.PointsMaterial({size:ptSz*.8,vertexColors:true,sizeAttenuation:true});scene.add(new THREE.Points(geom,mat));
-const gs=Math.ceil(range/10)*10;const grid=new THREE.GridHelper(gs,Math.ceil(gs/5),theme==="dark"?0x1a2030:0xcccccc,theme==="dark"?0x111822:0xdddddd);grid.position.y=-(aB.z1-aB.z0)/2;scene.add(grid);
-const upC=()=>{cam.position.set(dist*Math.sin(phi)*Math.cos(theta),dist*Math.cos(phi),dist*Math.sin(phi)*Math.sin(theta));cam.lookAt(0,0,0);cam3D.current={theta,phi,dist};};upC();
-let drag=false,px_=0,py_=0;const dE=ren.domElement;
-const oD=e=>{drag=true;px_=e.clientX;py_=e.clientY;};const oM=e=>{if(!drag)return;theta+=(e.clientX-px_)*.005;phi=Math.max(.1,Math.min(Math.PI-.1,phi-(e.clientY-py_)*.005));px_=e.clientX;py_=e.clientY;upC();};
-const oU=()=>{drag=false;};const oW=e=>{dist*=e.deltaY>0?1.08:.92;dist=Math.max(range*.05,Math.min(range*6,dist));upC();e.preventDefault();};
-dE.addEventListener("mousedown",oD);dE.addEventListener("mousemove",oM);dE.addEventListener("mouseup",oU);dE.addEventListener("mouseleave",oU);dE.addEventListener("wheel",oW,{passive:false});
-let aId;const an=()=>{aId=requestAnimationFrame(an);ren.render(scene,cam);};an();
-cleanR.current=()=>{cam3D.current={theta,phi,dist};cancelAnimationFrame(aId);dE.removeEventListener("mousedown",oD);dE.removeEventListener("mousemove",oM);dE.removeEventListener("mouseup",oU);dE.removeEventListener("mouseleave",oU);dE.removeEventListener("wheel",oW);geom.dispose();mat.dispose();ren.dispose();try{ren.forceContextLoss();}catch(_){}if(el.contains(dE))el.removeChild(dE);};
-return()=>{if(cleanR.current){cleanR.current();cleanR.current=null;}};},[view,aP,aB,aZ,cMode,segs,sel,ptSz,ptPct,theme,vT]);
+// ground grid at round values of the file's own coordinates, with labelled easting, northing and
+// elevation axes and a north arrow, so the cloud sits in its real coordinate frame
+const disp=[],ox=aP.ox||0,oy=aP.oy||0,ink=theme==="dark"?"#8fa3b5":"#3b4652",yG=zLo-cz;
+const E0=ox+aB.x0,E1=ox+aB.x1,N0=oy+aB.y0,N1=oy+aB.y1,gst=nS(Math.max(E1-E0,N1-N0)||1),dec=Math.max(0,-Math.floor(Math.log10(gst)+1e-9));
+const gE0=Math.floor(E0/gst)*gst,gE1=Math.ceil(E1/gst)*gst,gN0=Math.floor(N0/gst)*gst,gN1=Math.ceil(N1/gst)*gst;
+const sX=e=>e-ox-cx,sZ=n=>-(n-oy-cy);
+const lines=(arr,color)=>{const g=new THREE.BufferGeometry();g.setAttribute("position",new THREE.Float32BufferAttribute(arr,3));const m=new THREE.LineBasicMaterial({color});disp.push(g,m);return new THREE.LineSegments(g,m);};
+const gl=[];for(let e=gE0;e<=gE1+gst*1e-6;e+=gst)gl.push(sX(e),yG,sZ(gN0),sX(e),yG,sZ(gN1));for(let n=gN0;n<=gN1+gst*1e-6;n+=gst)gl.push(sX(gE0),yG,sZ(n),sX(gE1),yG,sZ(n));
+scene.add(lines(gl,theme==="dark"?0x1c2633:0xc8ccd2));
+if(axes3D){const ax=new THREE.Group(),lh=Math.max(gE1-gE0,gN1-gN0)*.028,pad=lh*.6,fT=.022,fH=.026;
+const lab=(text,col,h,cxA,cyA)=>{const fs=48,c=document.createElement("canvas"),g=c.getContext("2d");g.font=`${fs}px monospace`;c.width=Math.ceil(g.measureText(text).width)+16;c.height=fs+16;
+g.font=`${fs}px monospace`;g.fillStyle=col;g.textBaseline="middle";g.fillText(text,8,c.height/2);const tex=new THREE.CanvasTexture(c);tex.minFilter=THREE.LinearFilter;
+const m=new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false,sizeAttenuation:false});const s=new THREE.Sprite(m);s.scale.set(h*c.width/c.height,h,1);s.center.set(cxA,cyA);s.renderOrder=10;disp.push(tex,m);ax.add(s);return s;};
+// easting along the south edge, northing along the west edge, axis names beyond the ends,
+// elevation axis at the north-east corner (behind the cloud in the default view), north arrow on the north edge
+for(let e=gE0;e<=gE1+gst*1e-6;e+=gst)lab(e.toFixed(dec),ink,fT,.5,1).position.set(sX(e),yG,sZ(gN0)+pad);
+for(let n=gN0;n<=gN1+gst*1e-6;n+=gst)lab(n.toFixed(dec),ink,fT,1,.5).position.set(sX(gE0)-pad,yG,sZ(n));
+lab(L?"X · Doğu (m) →":"X · Easting (m) →",ac,fH,.5,1).position.set((sX(gE0)+sX(gE1))/2,yG,sZ(gN0)+pad+gst*.5);
+lab(L?"Y · Kuzey (m) ↑":"Y · Northing (m) ↑",ac,fH,1,.5).position.set(sX(gE0)-pad,yG,sZ(gN1)-gst*1.1);
+const nx=(sX(gE0)+sX(gE1))/2,nz=sZ(gN1),al=lh*3;ax.add(lines([nx,yG,nz,nx,yG,nz-al,nx,yG,nz-al,nx-al*.3,yG,nz-al*.6,nx,yG,nz-al,nx+al*.3,yG,nz-al*.6],0xff6384));
+lab(L?"K":"N","#ff6384",.032,.5,0).position.set(nx,yG,nz-al-lh*.3);
+const zs=nS(zHi-zLo||1),zdec=Math.max(0,-Math.floor(Math.log10(zs)+1e-9)),vx=sX(gE1),vz=sZ(gN1),zl=[vx,yG,vz,vx,zHi-cz,vz];
+for(let z=Math.ceil(zLo/zs)*zs;z<=zHi+1e-9;z+=zs){zl.push(vx,z-cz,vz,vx+lh*.5,z-cz,vz);lab(`${z.toFixed(zdec)} m`,ink,fT,0,.5).position.set(vx+lh*.7,z-cz,vz);}
+ax.add(lines(zl,theme==="dark"?0x8fa3b5:0x3b4652));lab(zH?(L?"Z · Zeminden yükseklik":"Z · Height above ground"):(L?"Z · Rakım":"Z · Elevation"),ac,fH,.5,0).position.set(vx,zHi-cz+lh*.6,vz);
+scene.add(ax);}
+// navigation: left drag rotates; right or middle drag, Shift+drag or pan mode moves the view;
+// the wheel zooms toward the point under the cursor; touch: one finger rotates, two fingers pan and pinch-zoom
+let dirty=true;const upC=()=>{cam.position.set(tgt.x+dist*Math.sin(phi)*Math.cos(theta),tgt.y+dist*Math.cos(phi),tgt.z+dist*Math.sin(phi)*Math.sin(theta));cam.lookAt(tgt);cam.updateMatrixWorld();
+cam3D.current={theta,phi,dist,tx:tgt.x,ty:tgt.y,tz:tgt.z,key:bKey};dirty=true;};upC();
+const dE=ren.domElement;dE.style.touchAction="none";dE.style.cursor="grab";
+const ptrs=new Map(),rc=new THREE.Raycaster(),ndc=new THREE.Vector2(),vR=new THREE.Vector3(),vU=new THREE.Vector3();let mode=null,last=null,pinch=null;
+const panBy=(dx,dy)=>{const wpp=2*dist*Math.tan(cam.fov*Math.PI/360)/(dE.clientHeight||H);vR.setFromMatrixColumn(cam.matrixWorld,0);vU.setFromMatrixColumn(cam.matrixWorld,1);
+tgt.addScaledVector(vR,-dx*wpp).addScaledVector(vU,dy*wpp);upC();};
+const zoomAt=(f,px,py)=>{const nd=Math.max(range*.01,Math.min(range*6,dist*f)),ef=nd/dist;if(ef===1)return;
+const r=dE.getBoundingClientRect();ndc.set(((px-r.left)/r.width)*2-1,-((py-r.top)/r.height)*2+1);rc.setFromCamera(ndc,cam);const o=rc.ray.origin,d=rc.ray.direction;
+if(Math.abs(d.y)>1e-6){const t=(tgt.y-o.y)/d.y;if(t>0&&t<dist*20){const hit=o.clone().addScaledVector(d,t);tgt.sub(hit).multiplyScalar(ef).add(hit);}}dist=nd;upC();};
+const panBtn=e=>e.pointerType==="mouse"&&(e.button===1||e.button===2||e.shiftKey||e.ctrlKey||e.metaKey);
+const oD=e=>{if(e.pointerType==="mouse"&&e.button===1)e.preventDefault();try{dE.setPointerCapture(e.pointerId);}catch(_){}ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+if(ptrs.size===1){mode=panBtn(e)||pan3DR.current?"pan":"rot";last={x:e.clientX,y:e.clientY};}
+else if(ptrs.size===2){const[p1,p2]=[...ptrs.values()];pinch={d:Math.hypot(p1.x-p2.x,p1.y-p2.y),mx:(p1.x+p2.x)/2,my:(p1.y+p2.y)/2};mode="pinch";}
+dE.style.cursor=mode==="pan"?"move":"grabbing";};
+const oM=e=>{if(!ptrs.has(e.pointerId))return;ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+if(mode==="pinch"&&ptrs.size>=2){const[p1,p2]=[...ptrs.values()],d=Math.hypot(p1.x-p2.x,p1.y-p2.y),mx=(p1.x+p2.x)/2,my=(p1.y+p2.y)/2;
+panBy(mx-pinch.mx,my-pinch.my);if(d>0&&pinch.d>0)zoomAt(pinch.d/d,mx,my);pinch={d,mx,my};return;}
+if(!last)return;const dx=e.clientX-last.x,dy=e.clientY-last.y;last={x:e.clientX,y:e.clientY};
+if(mode==="pan")panBy(dx,dy);else if(mode==="rot"){theta+=dx*.005;phi=Math.max(.05,Math.min(Math.PI-.1,phi-dy*.005));upC();}};
+const oU=e=>{ptrs.delete(e.pointerId);pinch=null;if(ptrs.size===1){const[p1]=[...ptrs.values()];last={x:p1.x,y:p1.y};mode=pan3DR.current?"pan":"rot";}else if(!ptrs.size){mode=null;last=null;dE.style.cursor="grab";}};
+const oW=e=>{e.preventDefault();const dy=e.deltaMode===1?e.deltaY*33:e.deltaY;zoomAt(Math.exp(Math.max(-.5,Math.min(.5,dy*.0015))),e.clientX,e.clientY);};
+const oC=e=>e.preventDefault();
+const evs=[["pointerdown",oD],["pointermove",oM],["pointerup",oU],["pointercancel",oU],["contextmenu",oC]];evs.forEach(([k,f])=>dE.addEventListener(k,f));dE.addEventListener("wheel",oW,{passive:false});
+ctl3D.current={reset:()=>{theta=Math.PI/4;phi=Math.PI/3.2;dist=range*1.6;tgt.set(0,0,0);upC();},top:()=>{theta=Math.PI/2;phi=.05;dist=range*1.3;tgt.set(0,0,0);upC();}};
+// follow the size of the view (window resize, panel changes)
+const ro=typeof ResizeObserver!=="undefined"?new ResizeObserver(()=>{const w=el.offsetWidth,h=el.offsetHeight;if(w&&h&&(w!==dE.clientWidth||h!==dE.clientHeight)){ren.setSize(w,h);cam.aspect=w/h;cam.updateProjectionMatrix();dirty=true;}}):null;if(ro)ro.observe(el);
+// draw only when something changed
+let aId;const an=()=>{aId=requestAnimationFrame(an);if(dirty){ren.render(scene,cam);dirty=false;}};an();
+cleanR.current=()=>{cancelAnimationFrame(aId);if(ro)ro.disconnect();ctl3D.current=null;evs.forEach(([k,f])=>dE.removeEventListener(k,f));dE.removeEventListener("wheel",oW);
+geom.dispose();mat.dispose();disp.forEach(d=>d.dispose());ren.dispose();try{ren.forceContextLoss();}catch(_){}if(el.contains(dE))el.removeChild(dE);};
+return()=>{if(cleanR.current){cleanR.current();cleanR.current=null;}};},[view,aP,aB,aZ,cMode,segs,sel,ptSz,ptPct,theme,vT,axes3D,L,ac,zH,nzMax]);
 
 // --- mouse ---
 const handleMouse=useCallback((e,act)=>{const c=topR.current;if(!c||!c._tr)return;const rect=c.getBoundingClientRect();
 const px=(e.clientX-rect.left)*2,py=(e.clientY-rect.top)*2;const{oX,oY,sc,xMn,yMn}=c._tr;const wx=(px-oX)/sc+xMn,wy=(oY-py)/sc+yMn;
 if(act==="down")dragR.current={on:true,moved:false,sx:e.clientX,sy:e.clientY,px:pan.x,py:pan.y};
-else if(act==="move"){if(!dragR.current.on)return;if(Math.abs(e.clientX-dragR.current.sx)>4||Math.abs(e.clientY-dragR.current.sy)>4)dragR.current.moved=true;
+else if(act==="move"){const P=cR.current||dR.current;if(coordR.current&&P)coordR.current.textContent=`E ${(wx+(P.ox||0)).toFixed(1)}  N ${(wy+(P.oy||0)).toFixed(1)}`;if(!dragR.current.on)return;if(Math.abs(e.clientX-dragR.current.sx)>4||Math.abs(e.clientY-dragR.current.sy)>4)dragR.current.moved=true;
 if(dragR.current.moved)setPan({x:dragR.current.px+(e.clientX-dragR.current.sx),y:dragR.current.py+(e.clientY-dragR.current.sy)});}
 else if(act==="up"){const wd=dragR.current.moved;dragR.current.on=false;dragR.current.moved=false;
 if(!wd){if(tMode){if(!tP1)setTP1({x:wx,y:wy});else{setTP2({x:wx,y:wy});const pts=cR.current||dR.current,za=czR.current||zR.current;if(pts&&za)setTData(exTr(pts,za,tP1,{x:wx,y:wy},2));setTMode(false);}}
@@ -575,13 +636,27 @@ return(
       <div style={{flex:2,position:"relative",minWidth:0,minHeight:0}}>
         <canvas ref={topR} style={{position:"absolute",left:0,top:0,width:"100%",height:"100%",cursor:tMode?"crosshair":"grab",display:"block"}}
           onMouseDown={e=>handleMouse(e,"down")} onMouseMove={e=>handleMouse(e,"move")}
-          onMouseUp={e=>handleMouse(e,"up")} onMouseLeave={e=>{dragR.current.on=false;dragR.current.moved=false;}}
+          onMouseUp={e=>handleMouse(e,"up")} onMouseLeave={e=>{dragR.current.on=false;dragR.current.moved=false;if(coordR.current)coordR.current.textContent="";}}
           onWheel={e=>handleMouse(e,"wheel")}/>
         <div style={{position:"absolute",bottom:6,left:6,fontSize:9,color:txD,background:dk+"cc",padding:"2px 6px",borderRadius:3}}>
           {tMode?(L?"Transect: 2 nokta":"Click 2 pts"):!clp&&zN?(L?"Tıkla→merkez | Sürükle→kaydır":"Click→center | Drag→pan"):(L?"Sürükle→kaydır":"Drag→pan")}</div>
+        <div ref={coordR} style={{position:"absolute",bottom:6,left:"50%",transform:"translateX(-50%)",fontSize:10,color:tx,background:dk+"cc",padding:"2px 8px",borderRadius:3,pointerEvents:"none",fontFamily:"monospace"}}/>
       </div>
       <div style={{flex:1,borderLeft:`1px solid ${bd}`,position:"relative",minWidth:0,minHeight:0}}><canvas ref={sideR} style={{position:"absolute",left:0,top:0,width:"100%",height:"100%",display:"block"}}/></div>
-    </>):(<div ref={threeR} style={{flex:1}}/>)}
+    </>):(<div style={{flex:1,position:"relative",minWidth:0,minHeight:0}}>
+      <div ref={threeR} style={{position:"absolute",inset:0}}/>
+      {aP&&<div style={{position:"absolute",top:8,right:8,zIndex:6,display:"flex",gap:4}}>
+        {[["⟲",L?"Sıfırla":"Reset",L?"Başlangıç görünümüne dön":"Back to the initial view",()=>ctl3D.current&&ctl3D.current.reset(),false],
+          ["⊤",L?"Üstten":"Top",L?"Üstten bak, kuzey yukarıda":"Look from above, north up",()=>ctl3D.current&&ctl3D.current.top(),false],
+          ["✋",L?"Kaydır":"Pan",L?"Kaydırma modu: sol tık ve tek parmak görünümü kaydırır (dokunmatik yüzey ve tablet için)":"Pan mode: left button and one finger move the view (for touchpads and tablets)",()=>setPan3D(v=>!v),pan3D],
+          ["#",L?"Eksenler":"Axes",L?"Koordinat eksenlerini göster/gizle":"Show or hide the coordinate axes",()=>setAxes3D(v=>!v),axes3D],
+          ...(aZ?[["⇕",zH?(L?"Zeminden":"Above ground"):(L?"Rakım":"Elevation"),L?"Dikey eksen: zeminden yükseklik veya dosyadaki rakım (tıklayınca değişir)":"Vertical axis: height above ground or file elevation (click to switch)",()=>setZView(v=>v==="ground"?"elev":"ground"),zH]]:[])].map(([ic,lb,tt,fn,on])=>(
+          <button key={lb} title={tt} onClick={fn} style={{...BT(on),background:on?ac+"22":dk+"e6"}}>{ic} {lb}</button>))}
+      </div>}
+      {aP&&<div style={{position:"absolute",bottom:6,left:6,zIndex:6,fontSize:9,color:txM,background:dk+"cc",padding:"2px 6px",borderRadius:3,pointerEvents:"none"}}>
+        {L?"Sol tık: döndür · Sağ/orta tık veya Shift+sürükle: kaydır · Tekerlek: imlecin olduğu yere yakınlaş · Dokunmatik: 1 parmak döndür, 2 parmak kaydır ve yakınlaş"
+          :"Left drag: rotate · Right/middle drag or Shift+drag: pan · Wheel: zoom to cursor · Touch: one finger rotates, two fingers pan and zoom"}</div>}
+    </div>)}
   </div>
   {/* TRANSECT — SADECE 2D, her zaman DOM'da, veri yoksa height:0 */}
   {view==="2d"&&<div style={{height:hasTrans?210:0,overflow:"hidden",borderTop:hasTrans?"2px solid #ff6384":"none",flexShrink:0}}>
@@ -599,7 +674,8 @@ return(
 
 {tab==="tools"&&(<><Sc t={L?"Görüntü":"Display"}>
 <Rw l={L?"Boyut":"Size"}><input type="range" min={.5} max={5} step={.25} value={ptSz} onChange={e=>setPtSz(+e.target.value)} style={{flex:1}}/><span style={{fontSize:9,color:txM,width:20}}>{ptSz}</span></Rw>
-<Rw l={L?"Örnekleme":"Sample"}><input type="range" min={10} max={100} step={5} value={ptPct} onChange={e=>setPtPct(+e.target.value)} style={{flex:1}}/><span style={{fontSize:9,color:txM,width:28}}>{ptPct}%</span></Rw></Sc>
+<Rw l={L?"Örnekleme":"Sample"}><input type="range" min={10} max={100} step={5} value={ptPct} onChange={e=>setPtPct(+e.target.value)} style={{flex:1}}/><span style={{fontSize:9,color:txM,width:28}}>{ptPct}%</span></Rw>
+{aZ&&<Rw l={L?"Dikey eksen":"Vertical axis"}><div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{[["ground",L?"Zeminden yükseklik":"Height above ground"],["elev",L?"Rakım":"Elevation"]].map(([k,lb])=><button key={k} title={L?"3D görünüm ve yan görünüm":"3D view and side view"} style={{...BT(zView===k),padding:"2px 6px",fontSize:9}} onClick={()=>setZView(k)}>{lb}</button>)}</div></Rw>}</Sc>
 {cMode==="veglayer"&&<Sc t={L?"Vejetasyon Katmanı":"Vegetation Layers"}>
 <div style={{display:"flex",flexWrap:"wrap",gap:8,fontSize:9,color:txM,marginBottom:6}}>
 {[["g",L?"Zemin <":"Ground <"],["l",L?"Düşük <":"Low <"],["m",L?"Orta <":"Medium <"]].map(([k,lab])=><label key={k} style={{display:"flex",alignItems:"center",gap:3}}>{lab}<input type="number" step="0.5" min="0" value={vegThr[k]} onChange={e=>setVegThr({...vegThr,[k]:e.target.value})} style={{...IN,width:40,padding:"1px 3px"}}/>m</label>)}

@@ -98,7 +98,14 @@ If the DTM's elevation differs from the LAS by more than 50 m, FORA does not use
 
 ## 3. Look: 2D, 3D and colours
 
-- **2D** is the top-down map (shown first). **3D** is a view you can rotate and zoom.
+- **2D** is the top-down map (shown first). Grid labels are the file's real easting/northing; moving the mouse shows the cursor coordinates at the bottom.
+- **3D** is the three-dimensional view:
+  - **Left drag:** rotates.
+  - **Right or middle button drag, or Shift + drag:** pans.
+  - **Wheel:** zooms toward the point under the cursor.
+  - **Touch screen:** one finger rotates, two fingers pan and zoom.
+  - Buttons at the top right: **⟲ Reset** (initial view), **⊤ Top** (from above, north up), **✋ Pan** (left button also pans; for touchpads without a middle button), **# Axes** (coordinate grid, easting/northing and height axes, north arrow) and **⇕** (vertical axis).
+- **Vertical axis** (3D and the 2D side view; also Tools → Display): **Height above ground** is the default; the terrain is flattened so tree heights can be read from the axis. **Elevation** shows the file's real elevation. Points without a ground estimate (outside an external DTM) are not shown in the height-above-ground view.
 - **Colour modes:**
   - Height
   - Normalised (height above ground)
