@@ -5,8 +5,10 @@ Every model takes tree height (h, m) and, for two species, crown diameter
 equations published in the h = f(d) direction are inverted numerically by
 bisection, so no closed-form rearrangement is required.
 
-The DBH models are in `src/species.js`. Biomass models (134 above-ground, 45 root)
-are described in [BIOMASS_MODELS.md](BIOMASS_MODELS.md).
+Sections 1–7 describe FORA's own Turkish DBH models (`src/species.js`), used
+since v1. Since v2.0 they are one group in a choice of DBH models per species;
+the models from outside Türkiye are described at the end of this file. Biomass
+models (134 above-ground, 45 root) are described in [BIOMASS_MODELS.md](BIOMASS_MODELS.md).
 
 Two species are shipped as experimental proxies and are flagged `[BETA]` in
 the interface: *Pinus pinea* and *Quercus cerris*. They should not be used for
@@ -138,6 +140,37 @@ Research 37(1):61-66. https://doi.org/10.4129/ifm.2011.5.03
 This is a non-Turkish proxy. No published closed-form coefficients for Turkish
 *Q. cerris* were available at the time of implementation. Replacement with
 peer-reviewed Turkish coefficients is planned.
+
+---
+
+## DBH models from outside Türkiye (v2.0)
+
+`src/dbhLibrary.js` holds 27 DBH models generated from FORA's model-library
+workbook by `tools/build_biomass_library.py`; the test suite checks each against
+the workbook value at h = 18 m and five against coefficients typed from the
+papers. `src/dbhChoice.js` lists, for each species, its models by scope
+(Europe–Mediterranean, Türkiye, World). The recommended model is the first
+Europe–Mediterranean one; a species without one gets its first World model.
+
+| Code | Source | Region | Inputs (crown measure) |
+|---|---|---|---|
+| VAL | Valbuena Rabadán et al. 2016, Forest Systems 25(1):e046 | Spain, *P. sylvestris*, LiDAR | h + diameter of a circle with the crown's area |
+| KT-9.1.x, KT-9.3.x | Kalliovirta & Tokola 2005, Silva Fennica 39(2):227–248 | Finland; pine, spruce, birch, all | h, or h + maximum crown diameter |
+| BAL-D3 | Balenović et al. 2015, Forests 6:492–509 | Croatia, *P. nigra* | h + mean crown diameter |
+| JUC-D6 | Jucker et al. 2017, Global Change Biology 23:177–190, Eq. 6 | global | (h × mean crown diameter) |
+| JUC-S4-…, JUC-S3-… | Jucker et al. 2017, supplementary Tables S3–S4 | Palearctic, by biome and conifer/broadleaf | (h × mean crown diameter) |
+| GB-dbh1, GB-dbh2 | Gonzalez-Benecke et al. 2014, J. Forestry Research 25(1):43–52 | USA, *P. palustris* (not mapped to a FORA species) | h, or h + crown area |
+
+Each model receives the crown measure it was fitted with, computed from FORA's
+crown outline: the mean of the two bounding-box sides for a mean crown
+diameter, the hull's maximum diameter (or the longer bounding-box side) for a
+maximum crown diameter, 2·√(CPA/π) for an equal-area diameter. FORA's own
+models keep using the crown outline chosen in the Tools tab, as before.
+
+The Jucker regional model follows the biome of the species' main range in
+Türkiye (Olson et al. 2001, as used by Jucker et al.): temperate mixed forests
+for fir, Scots and black pine, beech and oak; woodlands and savannas, which
+include Mediterranean woodlands, for Calabrian and stone pine.
 
 ---
 

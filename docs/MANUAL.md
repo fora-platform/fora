@@ -26,7 +26,7 @@ Each step uses the result of the one before it. Species and Area can be done in 
 |---|---|---|
 | Load a new file | Everything | Start again |
 | Clip, or undo the clip (↩) | Trees, the Metrics table, Area results | Run Seg again |
-| Run Seg again | DBH₁, biomass, carbon, Area results **and the H₂ / CD₂ / DBH₂ field values you typed in** | Apply the species again, recalculate Area |
+| Run Seg again | DBH₁, biomass, carbon, Area results **and the H₂ / CD₂ / DBH₂ field values you typed in** | Press Apply again in the Sp tab, recalculate Area |
 
 > Settle your Seg settings before you type in field measurements.
 
@@ -44,7 +44,7 @@ If you close or reload the page, all results are lost. Export your **CSV** and *
 
 1. Press **Load LAS / LAZ File** and pick your file.
 2. Go to the **Seg** tab and press **Run**. FORA detects the trees and opens the **Metrics** tab for you.
-3. At the top of the Metrics tab, **pick the species** and press **Apply**. The DBH₁ column fills in.
+3. In the **Sp** tab, **pick the species** and press **Apply**. The DBH₁ column fills in.
 4. Go to the **Area** tab and press **Calculate**.
 5. Back in **Metrics**, press **📄 PDF**. Your inventory report downloads.
 
@@ -191,35 +191,41 @@ In short: **H, CD, DBH₁ = FORA's estimates. H₂, CD₂, DBH₂ = your measure
 
 ## 7. Species → diameter (DBH) and biomass
 
-You can pick the species in two places: at the top of the Metrics tab, or in the **Sp** tab. Both are the same setting.
+Species and models are chosen in one place, the **Sp** tab. The top of the Metrics tab only shows the species and models applied; **Change →** takes you to the Sp tab.
 
-1. Pick the species.
-2. In the **Sp** tab, check the biomass model (see below).
-3. Press **Apply**.
+1. Pick the species (7 species).
+2. Check or change the **DBH model** and the **biomass model**.
+3. Press **Apply**. If you change the selection without pressing Apply, a "Selection changed" warning appears.
 
-| Species | DBH₁ is based on |
-|---|---|
-| Scots pine (P. sylvestris) | height + crown diameter |
-| Uludağ fir (A. bornmuelleriana) | height + crown diameter |
-| Calabrian pine — coastal / inland / lake district (P. brutia) | height |
-| Black pine (P. nigra) | height |
-| Oriental beech (F. orientalis) | height |
-| Stone pine (P. pinea) | height |
-| Turkey oak (Q. cerris) **[BETA]** | height |
+In both lists the models are grouped by where their data come from: **Europe–Mediterranean**, **Türkiye**, **World**. The model marked *(recommended)* is used unless you pick another.
 
-- The source of each DBH model is shown in the Sp tab.
-- **BETA:** The Turkey oak DBH coefficients have not been verified for Türkiye yet. Use the results with care.
-- The **"Applied species"** line above the table tells you which species the values come from. If you pick another species from the list but do not press Apply, a "selection changed" warning appears.
-- **If you run Seg again, apply the species again.**
+### DBH model
+
+FORA estimates DBH from LiDAR height and crown. The recommended model is the Europe–Mediterranean one where there is one, otherwise a world model (Jucker et al. 2017, Palearctic region, by the biome of the species' main range and by conifer/broadleaf). The Turkish models FORA has used since v1 are in the **Türkiye** group.
+
+| Species | Recommended | In the Türkiye group (FORA's previous model) |
+|---|---|---|
+| Scots pine | VAL — Valbuena Rabadán et al. 2016 (Spain, LiDAR) | Gencal 2025 |
+| Uludağ fir | JUC-S4-21 — Jucker 2017 (temperate mixed, conifer) | Gencal 2025 |
+| Calabrian pine | JUC-S4-24 — Jucker 2017 (woodlands incl. Mediterranean, conifer) | Özçelik 2014 — coastal / inland / lake district |
+| Black pine | BAL-D3 — Balenović et al. 2015 (Croatia) | Özçelik 2014 |
+| Oriental beech | JUC-S4-20 — Jucker 2017 (temperate mixed, broadleaf) | Ercanlı 2015 |
+| Stone pine | JUC-S4-24 — Jucker 2017 | Carus & Akguş 2018 **[BETA]** |
+| Turkey oak | CIM11-QCE — Cimini & Salvati 2011 (Italy) **[BETA]** | — |
+
+- Each model gets the **crown measure** it was fitted with: Jucker and Balenović the mean crown diameter (bounding box), Kalliovirta & Tokola the maximum crown diameter, Valbuena the diameter of a circle with the crown's area. FORA's own models keep using the crown outline chosen in the Tools tab.
+- The box shows the inputs, data range and how the coefficients were checked; **Details** gives the source, region and equation. Calabrian pine's three regional models are no longer separate species but three DBH models in the Türkiye group.
+- Trees outside the model's data range get a DBH but are flagged; the line in the Metrics tab says how many. The **Across DBH models** line shows how much the mean DBH changes across every DBH model that fits the species.
+- **BETA:** the stone pine (Tarsus) and Turkey oak (Italy) models are approximate; use them with care.
+- **If you run Seg again, press Apply again.**
 
 ### Biomass model
 
 Every species now has biomass. FORA's model library holds 134 above-ground and 45 root models; [BIOMASS_MODELS.md](../BIOMASS_MODELS.md) lists them all.
 
-- **Scope:** the three buttons choose where the models come from: **Europe–Mediterranean** (default), **Türkiye** or **World**. The number on each button is how many models fit the species. A grey button means none; if you choose it, FORA uses Europe–Mediterranean and says so.
-- **Model:** the list shows the models of the scope; the first one, marked *recommended*, is used unless you pick another.
-- The box under the list shows the source, the inputs (DBH, height or crown diameter), the data range of the model and how its coefficients were checked (*verified against the paper*, *read twice from the open-access paper*, *secondary source*, *database record*). Orange means: read the note.
-- Trees outside the model's data range still get biomass (extrapolated); the line above the table says how many.
+- The recommended model is the first of the Europe–Mediterranean group; Türkiye and World models are chosen from the same list.
+- The box shows the inputs (DBH, height or crown diameter), the data range of the model, how its coefficients were checked (*verified against the paper*, *read twice from the open-access paper*, *secondary source*, *database record*) and the root model. Orange means: read the note.
+- Trees outside the model's data range still get biomass (extrapolated); the line in the Metrics tab says how many.
 - For Calabrian pine with the Türkiye model (Sönmez et al. 2016) the CSV also has stem, branch, bark and needle biomass. Since v2.0 its total is multiplied by 1.068, the standard correction for a model fitted on the log scale (the paper gives none).
 
 ---
@@ -296,7 +302,7 @@ A vertical cross-section along that line is drawn below the map, including a 1.3
 
 | What | Where | Contents |
 |---|---|---|
-| **Tree CSV** | Metrics → 📥 CSV | Every tree: height, crown measures (3 methods), coordinates, DBH, your measurements, species, biomass. Carbon columns, then the biomass model, an out-of-range flag and the source of below-ground biomass at the end. Below the table: area metrics (if calculated) and a carbon-method block (models, coefficients and their sources, model spread). |
+| **Tree CSV** | Metrics → 📥 CSV | Every tree: height, crown measures (3 methods), coordinates, DBH, your measurements, species, biomass. Carbon columns, then the biomass model, an out-of-range flag, the source of below-ground biomass, the DBH model and its out-of-range flag at the end. Below the table: the DBH model block, area metrics (if calculated) and a carbon-method block (models, coefficients and their sources, model spread). |
 | **Area CSV** | Area → 📥 Area CSV | Area metrics |
 | **PDF report** | Metrics → 📄 PDF | Summary, statistics, height histogram and the parameters used. Area and stem density if Area was calculated; a carbon page if biomass was computed. The biomass model, its source and the carbon method are written out. |
 | **Image** | Tools → Save Image | The map (fora_map.png) in 2D view, or the 3D view (fora_3d.png) in 3D |
@@ -308,10 +314,10 @@ The PDF report is in English. Turkish letters are written in simplified form (ı
 ## Frequently asked questions
 
 **DBH₁ is empty.**
-No species has been applied. Pick a species at the top of the Metrics tab and press Apply.
+No species has been applied. Pick a species in the Sp tab and press Apply.
 
 **DBH₁ shows "–".**
-That tree's height is outside the valid range of the chosen species model. This is not an error; the model is simply not defined for that height.
+The DBH model gave no result for that tree: its height (or crown) is outside the range where the model is defined. This is not an error; you can try another DBH model in the Sp tab.
 
 **The carbon panel does not appear.**
 Apply a species first. If the panel still does not appear, all trees may be outside the DBH model's height range.

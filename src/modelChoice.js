@@ -33,6 +33,7 @@ export const STATUS_EN = {
   "Web okuması — dikkat": "read twice from the open-access paper; read the note before use",
   "İkincil kaynak": "coefficients from a paper that quotes the original",
   "Site kaydı": "coefficients from a public equation database (treeallometry.org)",
+  "FORA modeli": "FORA's own DBH model since v1 (see ALLOMETRIC_MODELS.md)",
 };
 
 // group: IPCC group for the carbon defaults (conifer, broadleaf, oak)
@@ -177,7 +178,8 @@ export function evalModel(model, d, h, cd) {
 }
 
 // Stand above-ground biomass from every model listed for the species, as a
-// measure of model uncertainty. Trees are FORA's met records (dbhModel, h, cd).
+// measure of model uncertainty. Trees are FORA's met records (dbhModel, h and
+// the mean crown diameter cdBbox, which the crown-based models were fitted with).
 // A model's total counts only the trees it can compute; `trees` says how many.
 export function standSpread(trees, spId) {
   const models = modelsFor(spId);
@@ -185,7 +187,7 @@ export function standSpread(trees, spId) {
   const rows = models.map((m) => {
     let sum = 0, n = 0;
     for (const t of trees) {
-      const r = evalModel(m, t.dbhModel, t.h, t.cd);
+      const r = evalModel(m, t.dbhModel, t.h, t.cdBbox ?? t.cd);
       if (r.value != null) { sum += r.value; n++; }
     }
     return { code: m.code, scope: m.scope, status: m.status, agb_t: sum / 1000, trees: n };

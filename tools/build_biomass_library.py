@@ -1,4 +1,4 @@
-"""Build src/biomassLibrary.js from the FORA model library workbook.
+"""Build src/biomassLibrary.js and src/dbhLibrary.js from the FORA model library workbook.
 
 Usage (from the repository root):
     python tools/build_biomass_library.py path/to/FORA_model_kutuphanesi.xlsx
@@ -6,7 +6,9 @@ Usage (from the repository root):
 The workbook must hold computed values (open and save it once in Excel or
 LibreOffice). Every formula in the workbook's biomass sheets is translated to
 JavaScript, evaluated with Node at d = 25 cm, h = 18 m, CD = 4 m and compared
-with the workbook's own value; the script stops if any differs.
+with the workbook's own value; the script stops if any differs. The DBH models
+(sheets DBH_modelleri and Jucker_bolgesel, Palearctic rows) are checked the
+same way at h = 18 m with the crown measure each model uses.
 Requires: Python 3 with openpyxl, Node.js.
 """
 import sys, re, json, math, subprocess
@@ -252,7 +254,7 @@ for m in models:
     lines.append('  {' + ','.join(fields) + '}')
 head = '''// biomassLibrary.js — FORA's allometric biomass model library.
 //
-// GENERATED from FORA_model_kutuphanesi.xlsx (library version 9, 13 Nov 2026);
+// GENERATED from FORA_model_kutuphanesi.xlsx (library version 10, 13 Nov 2026);
 // do not edit by hand. Every coefficient in that workbook was checked against
 // the original paper (status "Doğrulandı"), read twice from the open-access
 // web version ("Web okuması"), taken from a paper that quotes the original
@@ -270,4 +272,82 @@ head = '''// biomassLibrary.js — FORA's allometric biomass model library.
 '''
 src = head + '\nexport const MODELS = [\n' + ',\n'.join(lines) + '\n];\n\nexport const MODEL_BY_CODE = Object.fromEntries(MODELS.map((m) => [m.code, m]));\n'
 open(OUT, 'w', encoding='utf-8').write(src)
+print(len(src), 'bytes')
+
+
+# =====================================================================================
+# DBH models: height (and crown) -> DBH. Sheets DBH_modelleri and Jucker_bolgesel.
+# Each model gets the crown measure it was fitted with (column "Taç ölçüsü"):
+#   mean  mean crown diameter (Jucker; Balenović: mean of two perpendicular widths) -> FORA bounding-box CD
+#   max   maximum crown diameter (Kalliovirta & Tokola) -> hull maximum diameter, or the longer bounding-box side
+#   eq    diameter of the circle with the crown's area (Valbuena) -> 2·sqrt(CPA/π)
+#   area  crown area (Gonzalez-Benecke) -> bounding-box ellipse area
+# In the workbook the test tree has CD 4 m; max = CD × ratio (Okuyun C15), area = Okuyun C17.
+OUT_DBH = 'src/dbhLibrary.js'
+ov = wv['Okuyun']
+H0, CD0, R0, CA0 = (ov[c].value for c in ('C13', 'C14', 'C15', 'C17'))
+CROWN = {'JUC-D6': 'mean', 'BAL-D3': 'mean', 'VAL': 'eq', 'GB-dbh2': 'area'}
+EU_KEYS = ('Finlandiya', 'Hırvatistan', 'İspanya', 'Avrupa')
+dbh = []
+dm, dmv = wf['DBH_modelleri'], wv['DBH_modelleri']
+for r in range(2, dm.max_row + 1):
+    code = dm.cell(row=r, column=1).value
+    if not code: continue
+    crown = 'max' if code.startswith('KT-9.3') else CROWN.get(code)
+    f = dm.cell(row=r, column=21).value[1:].replace('Okuyun!$C$14*Okuyun!$C$15', 'Okuyun!$C$14').replace('Okuyun!$C$17', 'Okuyun!$C$14')
+    reg = dm.cell(row=r, column=4).value or ''
+    dbh.append(dict(code=code, scope='tr' if reg.startswith('Türkiye') else ('eu' if any(k in reg for k in EU_KEYS) else 'world'),
+                    status=dm.cell(row=r, column=20).value, species=dm.cell(row=r, column=3).value, source=dm.cell(row=r, column=2).value, region=reg,
+                    eq=dm.cell(row=r, column=5).value, crown=crown, crownNote=dm.cell(row=r, column=11).value if crown else None,
+                    d=rng(dm.cell(row=r, column=14).value), h=rng(dm.cell(row=r, column=15).value), c=rng(dm.cell(row=r, column=16).value),
+                    n=num(dm.cell(row=r, column=17).value), doi=dm.cell(row=r, column=22).value, note=dm.cell(row=r, column=23).value,
+                    js=C.expr('DBH_modelleri', f), excel=dmv.cell(row=r, column=21).value,
+                    cdTest={'max': CD0 * R0, 'area': CA0}.get(crown, CD0)))
+jb, jbv = wf['Jucker_bolgesel'], wv['Jucker_bolgesel']
+for r in range(3, jb.max_row + 1):
+    code = jb.cell(row=r, column=1).value
+    if not code or not str(jb.cell(row=r, column=3).value).startswith('Palearktik'): continue
+    grp, ft = jb.cell(row=r, column=5).value, jb.cell(row=r, column=4).value
+    dbh.append(dict(code=code, scope='world', status='Doğrulandı — dikkat', species=f'{grp}; {ft}',
+                    source=f'Jucker vd. 2017, Global Change Biology 23:177–190 (Ek, Tablo {jb.cell(row=r, column=2).value})',
+                    region=f'Palearktik bölge (Avrupa, Kuzey Afrika, Asya; Türkiye dahil) — {ft}', eq='D = α·(H × CD)^β', crown='mean',
+                    crownNote='Ortalama taç çapı (Ek S1)', d=None, h=None, c=None, n=None, doi='10.1111/gcb.13388',
+                    note=f'α çarpan olarak okunuyor (makalenin Şekil 3 açıklaması); grup modellerinin σ değeri verilmemiş, düzeltme yok. CV %{jb.cell(row=r, column=8).value}.',
+                    js=C.expr('Jucker_bolgesel', jb.cell(row=r, column=10).value[1:]), excel=jbv.cell(row=r, column=10).value, cdTest=CD0))
+codes = [m['code'] for m in dbh]
+assert len(codes) == len(set(codes)), codes
+for m in dbh: m['inputs'] = [v for v in ('h', 'cd') if re.search(rf'(?<![A-Za-z_.]){v}(?![A-Za-z_])', m['js'])]
+src = 'const M=' + json.dumps([{'code': m['code'], 'js': m['js'], 'cd': m['cdTest']} for m in dbh]) + f';\nconst out={{}};for(const m of M){{const f=new Function("h","cd","return "+m.js);out[m.code]=f({H0},m.cd);}}console.log(JSON.stringify(out));'
+res = json.loads(subprocess.run(['node', '-e', src], capture_output=True, text=True, check=True).stdout)
+bad = 0
+for m in dbh:
+    if not isinstance(m['excel'], (int, float)): sys.exit(f'{m["code"]}: no computed value in the workbook')
+    m['test'] = res[m['code']]
+    if not (abs(m['test'] - m['excel']) <= 1e-9 * max(1, abs(m['excel']))):
+        bad += 1; print('FARK', m['code'], m['test'], m['excel'])
+if bad: sys.exit('DBH formula check failed')
+print(len(dbh), 'DBH modeli; fark', bad)
+lines = []
+for m in dbh:
+    fields = [f'code:{s(m["code"])}', f'scope:{s(m["scope"])}', f'status:{s(m["status"])}', f'species:{s(m["species"])}', f'source:{s(short(m["source"], 300))}',
+              f'region:{s(short(m["region"], 200))}', f'eq:{s(short(m["eq"], 200))}', f'inputs:{s(m["inputs"])}', f'crown:{s(m["crown"])}', f'crownNote:{s(short(m["crownNote"], 200))}',
+              f'd:{s(m["d"])}', f'h:{s(m["h"])}', f'c:{s(m["c"])}', f'n:{s(int(m["n"]) if m["n"] else None)}', f'doi:{s(m["doi"])}', f'note:{s(short(m["note"]))}',
+              f'testCd:{repr(m["cdTest"])}', f'test:{repr(m["test"])}', f'fn:(h,cd)=>{m["js"]}']
+    lines.append('  {' + ','.join(fields) + '}')
+head = '''// dbhLibrary.js — DBH models from outside Türkiye in FORA's model library.
+//
+// GENERATED from FORA_model_kutuphanesi.xlsx (library version 10, 13 Nov 2026),
+// sheets DBH_modelleri and Jucker_bolgesel (Palearctic rows); do not edit by hand.
+// FORA's own Turkish DBH models are in species.js; dbhChoice.js combines both.
+//
+// Each model: fn(h, cd) returns DBH in cm from height h (m) and the crown
+// measure cd named in `crown` (null when the model uses height only):
+//   "mean" mean crown diameter (m)          "max"  maximum crown diameter (m)
+//   "eq"   diameter of a circle with the crown's area (m)   "area" crown area (m²)
+// d / h / c: data range of DBH (cm), height (m) and crown (m) [min, max], or null.
+// test: value computed in the workbook at h = 18 m and crown testCd; the test
+// suite checks every fn against it.
+'''
+src = head + '\nexport const DBH_MODELS = [\n' + ',\n'.join(lines) + '\n];\n\nexport const DBH_BY_CODE = Object.fromEntries(DBH_MODELS.map((m) => [m.code, m]));\n'
+open(OUT_DBH, 'w', encoding='utf-8').write(src)
 print(len(src), 'bytes')

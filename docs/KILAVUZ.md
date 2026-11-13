@@ -26,7 +26,7 @@ Her adım bir öncekinin sonucunu kullanır. Tür ve Alan'ın kendi aralarındak
 |---|---|---|
 | Yeni dosya yüklersen | Her şey | Baştan başla |
 | Kesersen (Clip) ya da kesmeyi geri alırsan (↩) | Ağaçlar, Metrik tablosu, Alan sonuçları | Seg'i yeniden çalıştır |
-| Seg'i yeniden çalıştırırsan | DBH₁, biyokütle, karbon, Alan sonuçları **ve elle girdiğin H₂ / CD₂ / DBH₂ ölçümleri** | Türü yeniden uygula, Alan'ı yeniden hesapla |
+| Seg'i yeniden çalıştırırsan | DBH₁, biyokütle, karbon, Alan sonuçları **ve elle girdiğin H₂ / CD₂ / DBH₂ ölçümleri** | Tür sekmesinde yeniden Uygula, Alan'ı yeniden hesapla |
 
 > Sahada ölçtüğün değerleri girmeden önce Seg ayarlarını kesinleştir.
 
@@ -44,7 +44,7 @@ Sayfayı kapatırsan ya da yenilersen bütün sonuçlar kaybolur. İşin bitince
 
 1. **LAS / LAZ Dosyası Yükle** butonuna bas ve dosyanı seç.
 2. **Seg** sekmesine geç, **Çalıştır**'a bas. FORA ağaçları bulur ve kendiliğinden **Metrik** sekmesini açar.
-3. Metrik sekmesinin en üstünden **türü seç**, **Uygula**'ya bas. DBH₁ sütunu dolar.
+3. **Tür** sekmesinde **türü seç**, **Uygula**'ya bas. DBH₁ sütunu dolar.
 4. **Alan** sekmesine geç, **Hesapla**'ya bas.
 5. **Metrik** sekmesine dön, **📄 PDF**'e bas. Envanter raporun iner.
 
@@ -191,35 +191,41 @@ VWS'nin hazır ayarları: **Pine** (iğne yapraklı), **Deciduous** (geniş yapr
 
 ## 7. Tür → çap (DBH) ve biyokütle
 
-Türü iki yerden seçebilirsin: Metrik sekmesinin üstünden ya da **Tür** sekmesinden. İkisi aynı ayardır.
+Tür ve modeller tek yerden, **Tür** sekmesinden seçilir. Metrik sekmesinin üstünde yalnızca uygulanan tür ve modeller yazar; **Değiştir →** seni Tür sekmesine götürür.
 
-1. Türü seç.
-2. **Tür** sekmesinde biyokütle modeline bak (aşağıda).
-3. **Uygula**'ya bas.
+1. Türü seç (7 tür).
+2. **Çap (DBH) modelini** ve **biyokütle modelini** kontrol et ya da değiştir.
+3. **Uygula**'ya bas. Seçimi değiştirip Uygula'ya basmazsan "Seçim değişti" uyarısı çıkar.
 
-| Tür | DBH₁ hangi bilgiden |
-|---|---|
-| Sarıçam (P. sylvestris) | boy + taç çapı |
-| Göknar (A. bornmuelleriana) | boy + taç çapı |
-| Kızılçam — Sahil / İç / Göl (P. brutia) | boy |
-| Karaçam (P. nigra) | boy |
-| Kayın (F. orientalis) | boy |
-| Fıstıkçamı (P. pinea) | boy |
-| Meşe (Q. cerris) **[BETA]** | boy |
+Her iki listede modeller nereden geldiklerine göre gruplu: **Avrupa–Akdeniz**, **Türkiye**, **Dünya**. *(önerilen)* yazan model, sen başkasını seçmedikçe kullanılır.
 
-- Her DBH modelinin kaynağı Tür sekmesinde yazar.
-- **BETA:** Meşenin DBH katsayıları Türkiye için henüz doğrulanmadı. Sonuçları dikkatli kullan.
-- Tablonun üstündeki **"Uygulanan tür"** satırı, değerlerin hangi türden geldiğini söyler. Listeden başka tür seçip Uygula'ya basmazsan "seçim değişti" uyarısı çıkar.
-- **Seg'i yeniden çalıştırırsan türü yeniden uygula.**
+### Çap (DBH) modeli
+
+FORA çapı LiDAR boyundan ve tacından tahmin eder. Önerilen model, varsa Avrupa–Akdeniz modelidir; yoksa Dünya modeli (Jucker vd. 2017, Palearktik bölge; türün ana yayılışının biyomuna ve iğne/geniş yapraklıya göre). FORA'nın v1'den beri kullandığı Türkiye modelleri **Türkiye** grubunda.
+
+| Tür | Önerilen | Türkiye grubunda (FORA'nın eski modeli) |
+|---|---|---|
+| Sarıçam | VAL — Valbuena Rabadán vd. 2016 (İspanya, LiDAR) | Gencal 2025 |
+| Uludağ göknarı | JUC-S4-21 — Jucker 2017 (ılıman karışık, iğne yapraklı) | Gencal 2025 |
+| Kızılçam | JUC-S4-24 — Jucker 2017 (Akdeniz dahil seyrek ormanlar, iğne yapraklı) | Özçelik 2014 — sahil / iç / Göller |
+| Karaçam | BAL-D3 — Balenović vd. 2015 (Hırvatistan) | Özçelik 2014 |
+| Doğu kayını | JUC-S4-20 — Jucker 2017 (ılıman karışık, geniş yapraklı) | Ercanlı 2015 |
+| Fıstıkçamı | JUC-S4-24 — Jucker 2017 | Carus & Akguş 2018 **[BETA]** |
+| Saçlı meşe | CIM11-QCE — Cimini & Salvati 2011 (İtalya) **[BETA]** | — |
+
+- Her model, uydurulduğu **taç ölçüsünü** alır: Jucker ve Balenović ortalama taç çapını (sınır kutusu), Kalliovirta & Tokola en büyük taç çapını, Valbuena taç alanına eşit dairenin çapını. FORA'nın kendi modelleri Araç sekmesinde seçtiğin taç yöntemini kullanmaya devam eder.
+- Kutuda girdiler, veri aralığı ve doğrulama durumu yazar; **Ayrıntı**'da kaynak, bölge ve denklem var. Kızılçamın üç bölge modeli artık ayrı tür değil, Türkiye grubunda üç çap modeli.
+- Modelin veri aralığı dışındaki ağaçlar çap alır ama işaretlenir; Metrik sekmesindeki satır kaç ağaç olduğunu söyler. **Çap modelleri arası** satırı, türe uyan bütün çap modelleriyle ortalama DBH'nin ne kadar değiştiğini gösterir.
+- **BETA:** Fıstıkçamı (Tarsus) ve saçlı meşe (İtalya) modelleri yaklaşık; dikkatli kullan.
+- **Seg'i yeniden çalıştırırsan Uygula'ya yeniden bas.**
 
 ### Biyokütle modeli
 
 Artık her türün biyokütlesi var. FORA'nın model kütüphanesinde 134 toprak üstü ve 45 kök modeli bulunuyor; hepsinin listesi [BIOMASS_MODELS.md](../BIOMASS_MODELS.md) dosyasında.
 
-- **Kapsam:** Üç düğme modellerin nereden geleceğini seçer: **Avrupa–Akdeniz** (varsayılan), **Türkiye** ya da **Dünya**. Düğmedeki sayı, o kapsamda bu türe uyan model sayısıdır. Gri düğme o kapsamda model olmadığı anlamına gelir; onu seçersen FORA Avrupa–Akdeniz modelini kullanır ve bunu yazar.
-- **Model:** Listede o kapsamın modelleri var. *Önerilen* yazan ilk model, sen başkasını seçmedikçe kullanılır.
-- Listenin altındaki kutuda kaynak, girdiler (DBH, boy ya da taç çapı), modelin veri aralığı ve katsayıların nasıl kontrol edildiği (*Doğrulandı*, *Web okuması*, *İkincil kaynak*, *Site kaydı*) yazar. Turuncu yazı "notu oku" demektir.
-- Modelin veri aralığı dışındaki ağaçlar da biyokütle alır (dışkestirim); tablonun üstündeki satır kaç ağaç olduğunu söyler.
+- Önerilen model Avrupa–Akdeniz grubunun ilk modeli; Türkiye ve Dünya modelleri aynı listeden seçilir.
+- Kutuda girdiler (DBH, boy ya da taç çapı), modelin veri aralığı, katsayıların nasıl kontrol edildiği (*Doğrulandı*, *Web okuması*, *İkincil kaynak*, *Site kaydı*) ve kök modeli yazar. Turuncu yazı "notu oku" demektir.
+- Modelin veri aralığı dışındaki ağaçlar da biyokütle alır (dışkestirim); Metrik sekmesindeki satır kaç ağaç olduğunu söyler.
 - Kızılçamda Türkiye modeli (Sönmez vd. 2016) seçiliyse CSV'de gövde, dal, kabuk ve ibre biyokütlesi de bulunur. v2.0'dan beri toplam biyokütle 1.068 ile çarpılıyor: logaritmik ölçekte uydurulmuş bir model için standart düzeltme bu (makale düzeltme vermiyor).
 
 ---
@@ -296,7 +302,7 @@ Bu çizgi boyunca dikey bir kesit altta çizilir; 1.3 m referans çizgisi de dah
 
 | Ne | Nereden | İçinde |
 |---|---|---|
-| **Ağaç CSV** | Metrik → 📥 CSV | Bütün ağaçlar: boy, taç ölçüleri (3 yöntem), koordinatlar, DBH, senin ölçümlerin, tür, biyokütle. Sonda karbon sütunları, ardından biyokütle modeli, aralık dışı işareti ve yer altı biyokütlesinin kaynağı. Altta, hesapladıysan alan metrikleri ve karbon yöntemi bölümü (modeller, katsayılar ve kaynakları, model aralığı). |
+| **Ağaç CSV** | Metrik → 📥 CSV | Bütün ağaçlar: boy, taç ölçüleri (3 yöntem), koordinatlar, DBH, senin ölçümlerin, tür, biyokütle. Sonda karbon sütunları, ardından biyokütle modeli, aralık dışı işareti, yer altı biyokütlesinin kaynağı, çap modeli ve onun aralık dışı işareti. Altta çap modeli bölümü, hesapladıysan alan metrikleri ve karbon yöntemi bölümü (modeller, katsayılar ve kaynakları, model aralığı). |
 | **Alan CSV** | Alan → 📥 Alan CSV | Alan metrikleri |
 | **PDF rapor** | Metrik → 📄 PDF | Özet, istatistikler, boy histogramı, kullanılan parametreler. Alan hesaplandıysa alan ve yoğunluk; biyokütle hesaplandıysa karbon sayfası. Biyokütle modeli, kaynağı ve karbon yöntemi yazılır. |
 | **Görüntü** | Araç → Görüntü Kaydet | 2D'deysen harita (fora_map.png), 3D'deysen 3D görüntü (fora_3d.png) |
@@ -308,10 +314,10 @@ PDF rapor İngilizcedir. Türkçe harfler rapora sade halleriyle yazılır: ı �
 ## Sık sorulanlar
 
 **DBH₁ boş.**
-Tür uygulanmamıştır. Metrik sekmesinin üstünden türü seçip Uygula'ya bas.
+Tür uygulanmamıştır. Tür sekmesinde türü seçip Uygula'ya bas.
 
 **DBH₁'de "–" var.**
-O ağacın boyu, seçilen türün modelinin geçerli aralığının dışında. Bu bir hata değil; model o boy için tanımlı değil.
+Çap modeli o ağaç için sonuç vermedi: boyu (ya da tacı) modelin tanımlı olduğu aralığın dışında. Bu bir hata değil; Tür sekmesinden başka bir çap modeli deneyebilirsin.
 
 **Karbon paneli görünmüyor.**
 Önce bir tür uygula. Panel yine çıkmıyorsa bütün ağaçlar DBH modelinin boy aralığı dışında kalmış olabilir.

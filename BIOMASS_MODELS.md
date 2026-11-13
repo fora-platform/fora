@@ -6,7 +6,7 @@ The library is generated from the FORA model-library workbook with `tools/build_
 
 ## Scope
 
-Models are grouped by where their data come from. The user chooses the scope in the **Sp** tab; the default is **Europe–Mediterranean**. When a species has no model in the chosen scope, FORA uses Europe–Mediterranean (then World) and says so.
+Models are grouped by where their data come from. In the **Sp** tab the biomass list is grouped by scope; the recommended model, used unless the user picks another, is the first Europe–Mediterranean one. Every FORA species has one. DBH models are chosen the same way (see [ALLOMETRIC_MODELS.md](ALLOMETRIC_MODELS.md)).
 
 | Scope | Meaning |
 |---|---|

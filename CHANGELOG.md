@@ -16,18 +16,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   them are the Spanish national equations of Montero et al. (2005) for Scots,
   black and stone pine, beech and two oaks, with root equations for all but beech.
 - Biomass and carbon for every species, not only Calabrian pine. In the Sp tab
-  the scope (Europe–Mediterranean by default, Türkiye, world) and the model can be
-  chosen; the source, inputs, data range and how the coefficients were checked
-  are shown. A scope without a model for the species falls back to
-  Europe–Mediterranean and says so.
+  the biomass model is chosen from a list grouped by scope (Europe–Mediterranean,
+  Türkiye, world); the recommended model is the first Europe–Mediterranean one.
+  The source, inputs, data range and how the coefficients were checked are shown.
+- Choice of DBH model: 27 models from outside Türkiye (`src/dbhLibrary.js`,
+  generated from the workbook: Valbuena Rabadán et al. 2016, Kalliovirta & Tokola
+  2005, Balenović et al. 2015, Jucker et al. 2017 global and Palearctic, and
+  Gonzalez-Benecke et al. 2014) next to FORA's own Turkish models, grouped by
+  scope in the Sp tab (`src/dbhChoice.js`). Each model receives the crown measure
+  it was fitted with (mean, maximum or equal-area crown diameter, or crown area);
+  the crown-based biomass models get the mean crown diameter.
+- DBH model spread: mean tree DBH from every DBH model that fits the species, in
+  the Metrics tab, CSV and PDF.
 - Below-ground biomass from root models where the species has one (from the same
   paper as the above-ground model where possible).
 - Model spread: stand above-ground biomass from every model that fits the
   species, in the carbon panel, CSV and PDF.
 - Trees outside a biomass model's data range are counted and flagged
   (CSV column `Biomass_out_of_range`).
-- Tests for every model against the workbook values and for nine models against
-  coefficients typed from the papers (`test/biomass.test.mjs`).
+- Tests for every model against the workbook values and for nine biomass and
+  five DBH models against coefficients typed from the papers
+  (`test/biomass.test.mjs`, `test/dbh.test.mjs`).
 
 ### Changed
 
@@ -43,11 +52,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unchanged.
 - Default biomass scope is Europe–Mediterranean: for Calabrian pine this is
   de-Miguel et al. (2014, Syria and Lebanon) instead of Sönmez et al. (2016);
-  choose Türkiye in the Sp tab for the previous model.
-- CSV: new columns `Biomass_model`, `Biomass_out_of_range`, `BGB_source`; the
-  carbon block records the models, coefficients and their sources.
-- PDF report: the biomass model, its source, data range and the carbon method
-  with its sources are written out.
+  choose it in the Türkiye group of the Sp tab for the previous model.
+- Default DBH model is the Europe–Mediterranean one, otherwise a Jucker et al.
+  (2017) Palearctic model, so DBH differs from v1.9.3 for every species but
+  Turkey oak. FORA's previous models are in the Türkiye group of the DBH list.
+- Species list: seven species. Calabrian pine's three regional models are DBH
+  models of one species instead of three species. Some Turkish names are more
+  precise (Uludağ göknarı, Doğu kayını, Saçlı meşe).
+- Species and models are chosen only in the Sp tab; the Metrics tab shows the
+  applied species and models with a link to the Sp tab, and warns in the Sp tab
+  when the selection has changed but was not applied.
+- CSV: new columns `Biomass_model`, `Biomass_out_of_range`, `BGB_source`,
+  `DBH_source`, `DBH_out_of_range`; a DBH_MODEL block and the carbon block record
+  the models, coefficients and their sources.
+- PDF report: the DBH and biomass models, their sources and data ranges and the
+  carbon method with its sources are written out.
 - Species DBH models moved from `App.jsx` to `src/species.js` (unchanged).
 
 ## [1.9.3] - 2026-11-13

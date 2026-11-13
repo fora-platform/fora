@@ -22,8 +22,8 @@
 - **Variable window size** — four presets (Pine, Deciduous, Combined, Linear-boreal) plus a custom-coefficient entry (linear or quadratic) for site-specific calibration
 - **Crown projection** — bounding box, convex hull, or concave hull (KNN-based)
 - **Area-based metrics** — height percentiles (H5–H99), density ratios (D1–D9), canopy cover (CC₁.₃), and variability statistics
-- **Allometric DBH estimation** for 8 Turkish tree species
-- **Biomass for every species** from a library of 134 above-ground and 45 root models (Türkiye, Europe–Mediterranean and world), each checked against its paper; scope and model selectable, with source, data range and model spread shown ([BIOMASS_MODELS.md](BIOMASS_MODELS.md))
+- **Allometric DBH estimation** for 7 species, chosen from FORA's own Turkish models and European and global ones (Jucker et al. 2017 and others); each model gets the crown measure it was fitted with ([ALLOMETRIC_MODELS.md](ALLOMETRIC_MODELS.md))
+- **Biomass for every species** from a library of 134 above-ground and 45 root models (Türkiye, Europe–Mediterranean and world), each checked against its paper; model selectable, with source, data range and model spread shown ([BIOMASS_MODELS.md](BIOMASS_MODELS.md))
 - **Carbon estimate** following IPCC 2006 (root models where available, otherwise the IPCC root-to-shoot ratio; carbon fraction by species group; coefficients shown and adjustable; estimates, not field-validated)
 - **Vertical transect profile** analysis
 - **Multi-format export** (CSV, PNG) and a **PDF inventory report**

@@ -60,5 +60,17 @@ export const SP=[
 ];
 
 
+// The seven species offered in the interface (v2.0). Calabrian pine's three
+// regional models in SP are DBH model choices of one species (dbhChoice.js).
+export const SPECIES=[
+  {id:"ps",nameTR:"Sarıçam (P. sylvestris)",nameEN:"Scots pine (P. sylvestris)"},
+  {id:"ab",nameTR:"Uludağ göknarı (A. bornmuelleriana)",nameEN:"Uludağ fir (A. bornmuelleriana)"},
+  {id:"pb",nameTR:"Kızılçam (P. brutia)",nameEN:"Calabrian pine (P. brutia)"},
+  {id:"pn",nameTR:"Karaçam (P. nigra)",nameEN:"Black pine (P. nigra)"},
+  {id:"fo",nameTR:"Doğu kayını (F. orientalis)",nameEN:"Oriental beech (F. orientalis)"},
+  {id:"pp",nameTR:"Fıstıkçamı (P. pinea)",nameEN:"Stone pine (P. pinea)"},
+  {id:"qc",nameTR:"Saçlı meşe (Q. cerris)",nameEN:"Turkey oak (Q. cerris)"},
+];
+
 // species display name in the current UI language
 export const spName=(s,L)=>s?(L?s.nameTR:s.nameEN):"";
