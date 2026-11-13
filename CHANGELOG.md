@@ -5,6 +5,51 @@ All notable changes to FORA will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2.0.0
+
+### Added
+
+- Biomass model library: 134 above-ground and 45 root models
+  (`src/biomassLibrary.js`, listed in BIOMASS_MODELS.md), generated from the FORA
+  model-library workbook, in which every coefficient was checked against its
+  paper. Models are grouped as Türkiye, Europe–Mediterranean or world. Among
+  them are the Spanish national equations of Montero et al. (2005) for Scots,
+  black and stone pine, beech and two oaks, with root equations for all but beech.
+- Biomass and carbon for every species, not only Calabrian pine. In the Sp tab
+  the scope (Europe–Mediterranean by default, Türkiye, world) and the model can be
+  chosen; the source, inputs, data range and how the coefficients were checked
+  are shown. A scope without a model for the species falls back to
+  Europe–Mediterranean and says so.
+- Below-ground biomass from root models where the species has one (from the same
+  paper as the above-ground model where possible).
+- Model spread: stand above-ground biomass from every model that fits the
+  species, in the carbon panel, CSV and PDF.
+- Trees outside a biomass model's data range are counted and flagged
+  (CSV column `Biomass_out_of_range`).
+- Tests for every model against the workbook values and for nine models against
+  coefficients typed from the papers (`test/biomass.test.mjs`).
+
+### Changed
+
+- Carbon defaults follow the IPCC 2006 tables for temperate forests: carbon
+  fraction 0.51 for conifers and 0.48 for broadleaves (Table 4.3); root-to-shoot
+  ratio by species group and stand above-ground biomass per hectare (Table 4.4,
+  middle class until the area is calculated). Previously R 0.29 and CF 0.47 for
+  all. Leaving the boxes empty uses the automatic values; a typed value overrides.
+- Calabrian pine with the Sönmez et al. (2016) model: the total above-ground
+  biomass is multiplied by exp(RSE²/2) = 1.068, the usual correction for a model
+  fitted on the log scale (the paper gives none). The same correction is applied
+  to the four other log-scale models without a published one. Components are
+  unchanged.
+- Default biomass scope is Europe–Mediterranean: for Calabrian pine this is
+  de-Miguel et al. (2014, Syria and Lebanon) instead of Sönmez et al. (2016);
+  choose Türkiye in the Sp tab for the previous model.
+- CSV: new columns `Biomass_model`, `Biomass_out_of_range`, `BGB_source`; the
+  carbon block records the models, coefficients and their sources.
+- PDF report: the biomass model, its source, data range and the carbon method
+  with its sources are written out.
+- Species DBH models moved from `App.jsx` to `src/species.js` (unchanged).
+
 ## [1.9.3] - 2026-11-13
 
 ### Added

@@ -9,6 +9,7 @@
 // Field names match App.jsx's met records:
 //   h (height m), cd (crown diameter m), cpa (crown proj. area m²),
 //   dbhModel (modelled DBH cm), bm_total (total biomass kg), cx/cy (coords).
+// meta.methodLines and meta.carbonMethod carry the model descriptions.
 //
 // Usage:
 //   import { jsPDF } from "jspdf";
@@ -203,16 +204,18 @@ export function buildInventoryPDF(trees, meta = {}, jsPDFCtor) {
     cy += 6;
     doc.setTextColor(...GREY); doc.setFont("helvetica", "normal"); doc.setFontSize(8);
     const method = c.method || {};
+    // meta.carbonMethod: the method sentence built by FORA (biomass model, root
+    // model or ratio, carbon fraction and their sources); a generic one otherwise
     const mtext =
-      `Method: below-ground biomass = AGB x ${method.rootToShoot ?? 0.29} (root-to-shoot). ` +
-      `Carbon = (AGB + BGB) x ${method.carbonFraction ?? 0.47} (carbon fraction). ` +
-      `CO2 equivalent = carbon x 44/12. ${method.source || "IPCC 2006 Guidelines, Vol. 4"}. ` +
-      `Above-ground biomass from the Sönmez et al. (2016) Pinus brutia equations. ` +
+      (meta.carbonMethod ||
+        `Method: below-ground biomass = AGB x ${method.rootToShoot ?? 0.29} (root-to-shoot). ` +
+        `Carbon = (AGB + BGB) x ${method.carbonFraction ?? 0.47} (carbon fraction). ` +
+        `CO2 equivalent = carbon x 44/12. ${method.source || "IPCC 2006 Guidelines, Vol. 4"}. `) +
       (c.treesWithBiomass < trees.length
-        ? `${trees.length - c.treesWithBiomass} trees fall outside the DBH model's height range and have no biomass; they are not included in the totals, so the true stock may be higher. `
+        ? `${trees.length - c.treesWithBiomass} trees have no biomass (outside the DBH model's height range, or no positive result from the biomass model); they are not included in the totals, so the true stock may be higher. `
         : "") +
       `These figures are estimated (IPCC methodology) and have not been validated with field measurements; for formal carbon-credit use they should be validated with field samples.`;
-    doc.text(doc.splitTextToSize(mtext, W - 2 * M), M, cy);
+    doc.text(doc.splitTextToSize(pdfText(mtext), W - 2 * M), M, cy);
   }
 
   // ---------- footer ----------

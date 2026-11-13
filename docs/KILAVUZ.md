@@ -194,45 +194,59 @@ VWS'nin hazır ayarları: **Pine** (iğne yapraklı), **Deciduous** (geniş yapr
 Türü iki yerden seçebilirsin: Metrik sekmesinin üstünden ya da **Tür** sekmesinden. İkisi aynı ayardır.
 
 1. Türü seç.
-2. **Uygula**'ya bas.
+2. **Tür** sekmesinde biyokütle modeline bak (aşağıda).
+3. **Uygula**'ya bas.
 
-| Tür | DBH₁ hangi bilgiden | Biyokütle |
-|---|---|---|
-| Sarıçam (P. sylvestris) | boy + taç çapı | yok |
-| Göknar (A. bornmuelleriana) | boy + taç çapı | yok |
-| Kızılçam — Sahil / İç / Göl (P. brutia) | boy | **var** (Sönmez et al. 2016) |
-| Karaçam (P. nigra) | boy | yok |
-| Kayın (F. orientalis) | boy | yok |
-| Fıstıkçamı (P. pinea) | boy | yok |
-| Meşe (Q. cerris) **[BETA]** | boy | yok |
+| Tür | DBH₁ hangi bilgiden |
+|---|---|
+| Sarıçam (P. sylvestris) | boy + taç çapı |
+| Göknar (A. bornmuelleriana) | boy + taç çapı |
+| Kızılçam — Sahil / İç / Göl (P. brutia) | boy |
+| Karaçam (P. nigra) | boy |
+| Kayın (F. orientalis) | boy |
+| Fıstıkçamı (P. pinea) | boy |
+| Meşe (Q. cerris) **[BETA]** | boy |
 
-- Her modelin kaynağı Tür sekmesinde yazar.
-- **BETA:** Meşe katsayıları Türkiye için henüz doğrulanmadı. Sonuçları dikkatli kullan.
+- Her DBH modelinin kaynağı Tür sekmesinde yazar.
+- **BETA:** Meşenin DBH katsayıları Türkiye için henüz doğrulanmadı. Sonuçları dikkatli kullan.
 - Tablonun üstündeki **"Uygulanan tür"** satırı, değerlerin hangi türden geldiğini söyler. Listeden başka tür seçip Uygula'ya basmazsan "seçim değişti" uyarısı çıkar.
 - **Seg'i yeniden çalıştırırsan türü yeniden uygula.**
 
+### Biyokütle modeli
+
+Artık her türün biyokütlesi var. FORA'nın model kütüphanesinde 134 toprak üstü ve 45 kök modeli bulunuyor; hepsinin listesi [BIOMASS_MODELS.md](../BIOMASS_MODELS.md) dosyasında.
+
+- **Kapsam:** Üç düğme modellerin nereden geleceğini seçer: **Avrupa–Akdeniz** (varsayılan), **Türkiye** ya da **Dünya**. Düğmedeki sayı, o kapsamda bu türe uyan model sayısıdır. Gri düğme o kapsamda model olmadığı anlamına gelir; onu seçersen FORA Avrupa–Akdeniz modelini kullanır ve bunu yazar.
+- **Model:** Listede o kapsamın modelleri var. *Önerilen* yazan ilk model, sen başkasını seçmedikçe kullanılır.
+- Listenin altındaki kutuda kaynak, girdiler (DBH, boy ya da taç çapı), modelin veri aralığı ve katsayıların nasıl kontrol edildiği (*Doğrulandı*, *Web okuması*, *İkincil kaynak*, *Site kaydı*) yazar. Turuncu yazı "notu oku" demektir.
+- Modelin veri aralığı dışındaki ağaçlar da biyokütle alır (dışkestirim); tablonun üstündeki satır kaç ağaç olduğunu söyler.
+- Kızılçamda Türkiye modeli (Sönmez vd. 2016) seçiliyse CSV'de gövde, dal, kabuk ve ibre biyokütlesi de bulunur. v2.0'dan beri toplam biyokütle 1.068 ile çarpılıyor: logaritmik ölçekte uydurulmuş bir model için standart düzeltme bu (makale düzeltme vermiyor).
+
 ---
 
-## 8. Karbon (sadece Kızılçam)
+## 8. Karbon
 
-Kızılçam türlerinden birini uyguladıktan sonra **Tür** sekmesinde **"Karbon tahmini (IPCC)"** paneli çıkar. Panelde şunlar var:
+Bir tür uyguladıktan sonra **Tür** sekmesinde **"Karbon tahmini (IPCC)"** paneli çıkar. Panelde şunlar var:
 
 - biyokütlesi olan ağaç sayısı (X / Y)
 - yer üstü biyokütle (AGB) ve yer altı biyokütle (BGB)
 - karbon stoku ve CO₂ eşdeğeri
 - Alan hesaplandıysa hektar başına değerler
+- **model aralığı:** türe uyan bütün modellerin verdiği meşcere yer üstü biyokütlesi (fareyi üstüne getirince her modelin değeri görünür)
 
 **Yöntem:**
 
 ```
-Yer altı (BGB) = Yer üstü (AGB) × R
+Yer altı (BGB) = kök modeli ya da Yer üstü (AGB) × R
 Karbon (C)     = (AGB + BGB) × CF
 CO₂e           = C × 44/12
 ```
 
-- Varsayılanlar **R = 0.29** ve **CF = 0.47**'dir (IPCC 2006, Cilt 4). İkisini de paneldeki kutulardan değiştirebilirsin.
-- IPCC'de R, meşcerenin hektar başına yer üstü biyokütlesine göre değişir. Panelde gördüğün AGB/ha değerine bakıp alanına uygun R'yi gir.
-- Modelin boy aralığı dışındaki ağaçların biyokütlesi yoktur ve toplama girmez. Bu yüzden gerçek stok gösterilenden yüksek olabilir. Panel kaç ağacın dışarıda kaldığını söyler.
+- **İki kutuyu boş bırakırsan** değerler otomatik gelir (IPCC 2006, Cilt 4, ılıman ormanlar):
+  - **Kök:** Türün kök modeli varsa o kullanılır (panel adını yazar). Yoksa Tablo 4.4'teki R; bu oran meşcerenin hektar başına yer üstü biyokütlesine göre değişir. Alan hesaplanmadıysa orta sınıf kullanılır (iğne yapraklı 0.29, geniş yapraklı 0.23, meşe 0.30).
+  - **CF:** iğne yapraklıda 0.51, geniş yapraklıda 0.48 (Tablo 4.3).
+- **Değer yazarsan** otomatik değerin yerine o kullanılır. Yazdığın R bütün ağaçlara uygulanır, kök modelleri de devre dışı kalır. **Otomatiğe dön** iki kutuyu da boşaltır.
+- DBH modelinin boy aralığı dışındaki ağaçların biyokütlesi yoktur ve toplama girmez. Bu yüzden gerçek stok gösterilenden yüksek olabilir. Panel kaç ağacın dışarıda kaldığını söyler.
 
 > **Önemli:** Bu değerler **tahmindir (IPCC yöntemi) ve saha ölçümüyle doğrulanmamıştır.** Karbon kredisi gibi resmi kullanımlar için saha örneklemesi gerekir.
 
@@ -282,9 +296,9 @@ Bu çizgi boyunca dikey bir kesit altta çizilir; 1.3 m referans çizgisi de dah
 
 | Ne | Nereden | İçinde |
 |---|---|---|
-| **Ağaç CSV** | Metrik → 📥 CSV | Bütün ağaçlar: boy, taç ölçüleri (3 yöntem), koordinatlar, DBH, senin ölçümlerin, tür, biyokütle. En sonda karbon sütunları. Altta, hesapladıysan alan metrikleri ve karbon yöntemi bölümü. |
+| **Ağaç CSV** | Metrik → 📥 CSV | Bütün ağaçlar: boy, taç ölçüleri (3 yöntem), koordinatlar, DBH, senin ölçümlerin, tür, biyokütle. Sonda karbon sütunları, ardından biyokütle modeli, aralık dışı işareti ve yer altı biyokütlesinin kaynağı. Altta, hesapladıysan alan metrikleri ve karbon yöntemi bölümü (modeller, katsayılar ve kaynakları, model aralığı). |
 | **Alan CSV** | Alan → 📥 Alan CSV | Alan metrikleri |
-| **PDF rapor** | Metrik → 📄 PDF | Özet, istatistikler, boy histogramı, kullanılan parametreler. Alan hesaplandıysa alan ve yoğunluk; Kızılçam uygulandıysa karbon sayfası. |
+| **PDF rapor** | Metrik → 📄 PDF | Özet, istatistikler, boy histogramı, kullanılan parametreler. Alan hesaplandıysa alan ve yoğunluk; biyokütle hesaplandıysa karbon sayfası. Biyokütle modeli, kaynağı ve karbon yöntemi yazılır. |
 | **Görüntü** | Araç → Görüntü Kaydet | 2D'deysen harita (fora_map.png), 3D'deysen 3D görüntü (fora_3d.png) |
 
 PDF rapor İngilizcedir. Türkçe harfler rapora sade halleriyle yazılır: ı → i, ş → s, ğ → g.
@@ -300,7 +314,7 @@ Tür uygulanmamıştır. Metrik sekmesinin üstünden türü seçip Uygula'ya ba
 O ağacın boyu, seçilen türün modelinin geçerli aralığının dışında. Bu bir hata değil; model o boy için tanımlı değil.
 
 **Karbon paneli görünmüyor.**
-Karbon sadece Kızılçam türlerinde hesaplanır. Bir Kızılçam türü uygula. Panel yine çıkmıyorsa bütün ağaçlar modelin aralığı dışında kalmış olabilir.
+Önce bir tür uygula. Panel yine çıkmıyorsa bütün ağaçlar DBH modelinin boy aralığı dışında kalmış olabilir.
 
 **İstat boş.**
 En az 3 ağaca saha ölçümü girmen gerekiyor. DBH için ayrıca türün uygulanmış olması gerekir.

@@ -23,8 +23,8 @@
 - **Crown projection** — bounding box, convex hull, or concave hull (KNN-based)
 - **Area-based metrics** — height percentiles (H5–H99), density ratios (D1–D9), canopy cover (CC₁.₃), and variability statistics
 - **Allometric DBH estimation** for 8 Turkish tree species
-- **Aboveground biomass** for *Pinus brutia* (five components)
-- **Carbon estimate** for *Pinus brutia* following IPCC 2006 (below-ground biomass, carbon, CO₂ equivalent; coefficients shown and adjustable; estimates, not field-validated)
+- **Biomass for every species** from a library of 134 above-ground and 45 root models (Türkiye, Europe–Mediterranean and world), each checked against its paper; scope and model selectable, with source, data range and model spread shown ([BIOMASS_MODELS.md](BIOMASS_MODELS.md))
+- **Carbon estimate** following IPCC 2006 (root models where available, otherwise the IPCC root-to-shoot ratio; carbon fraction by species group; coefficients shown and adjustable; estimates, not field-validated)
 - **Vertical transect profile** analysis
 - **Multi-format export** (CSV, PNG) and a **PDF inventory report**
 - **Bilingual UI** (English/Turkish), fully offline after first load (the LAZ and PDF components load the first time they are used)

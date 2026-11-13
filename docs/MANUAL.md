@@ -194,45 +194,59 @@ In short: **H, CD, DBH₁ = FORA's estimates. H₂, CD₂, DBH₂ = your measure
 You can pick the species in two places: at the top of the Metrics tab, or in the **Sp** tab. Both are the same setting.
 
 1. Pick the species.
-2. Press **Apply**.
+2. In the **Sp** tab, check the biomass model (see below).
+3. Press **Apply**.
 
-| Species | DBH₁ is based on | Biomass |
-|---|---|---|
-| Scots pine (P. sylvestris) | height + crown diameter | no |
-| Uludağ fir (A. bornmuelleriana) | height + crown diameter | no |
-| Calabrian pine — coastal / inland / lake district (P. brutia) | height | **yes** (Sönmez et al. 2016) |
-| Black pine (P. nigra) | height | no |
-| Oriental beech (F. orientalis) | height | no |
-| Stone pine (P. pinea) | height | no |
-| Turkey oak (Q. cerris) **[BETA]** | height | no |
+| Species | DBH₁ is based on |
+|---|---|
+| Scots pine (P. sylvestris) | height + crown diameter |
+| Uludağ fir (A. bornmuelleriana) | height + crown diameter |
+| Calabrian pine — coastal / inland / lake district (P. brutia) | height |
+| Black pine (P. nigra) | height |
+| Oriental beech (F. orientalis) | height |
+| Stone pine (P. pinea) | height |
+| Turkey oak (Q. cerris) **[BETA]** | height |
 
-- The source of each model is shown in the Sp tab.
-- **BETA:** The Turkey oak coefficients have not been verified for Türkiye yet. Use the results with care.
+- The source of each DBH model is shown in the Sp tab.
+- **BETA:** The Turkey oak DBH coefficients have not been verified for Türkiye yet. Use the results with care.
 - The **"Applied species"** line above the table tells you which species the values come from. If you pick another species from the list but do not press Apply, a "selection changed" warning appears.
 - **If you run Seg again, apply the species again.**
 
+### Biomass model
+
+Every species now has biomass. FORA's model library holds 134 above-ground and 45 root models; [BIOMASS_MODELS.md](../BIOMASS_MODELS.md) lists them all.
+
+- **Scope:** the three buttons choose where the models come from: **Europe–Mediterranean** (default), **Türkiye** or **World**. The number on each button is how many models fit the species. A grey button means none; if you choose it, FORA uses Europe–Mediterranean and says so.
+- **Model:** the list shows the models of the scope; the first one, marked *recommended*, is used unless you pick another.
+- The box under the list shows the source, the inputs (DBH, height or crown diameter), the data range of the model and how its coefficients were checked (*verified against the paper*, *read twice from the open-access paper*, *secondary source*, *database record*). Orange means: read the note.
+- Trees outside the model's data range still get biomass (extrapolated); the line above the table says how many.
+- For Calabrian pine with the Türkiye model (Sönmez et al. 2016) the CSV also has stem, branch, bark and needle biomass. Since v2.0 its total is multiplied by 1.068, the standard correction for a model fitted on the log scale (the paper gives none).
+
 ---
 
-## 8. Carbon (Calabrian pine only)
+## 8. Carbon
 
-After you apply one of the Calabrian pine species, the **"Carbon estimate (IPCC)"** panel appears in the **Sp** tab. It shows:
+After you apply a species, the **"Carbon estimate (IPCC)"** panel appears in the **Sp** tab. It shows:
 
 - the number of trees with biomass (X / Y)
 - above-ground biomass (AGB) and below-ground biomass (BGB)
 - carbon stock and CO₂ equivalent
 - per-hectare values, if Area has been calculated
+- the **model spread**: the stand's above-ground biomass from every model that fits the species (hold the mouse over it to see each model)
 
 **Method:**
 
 ```
-Below-ground (BGB) = Above-ground (AGB) × R
+Below-ground (BGB) = root model, or Above-ground (AGB) × R
 Carbon (C)         = (AGB + BGB) × CF
 CO₂e               = C × 44/12
 ```
 
-- The defaults are **R = 0.29** and **CF = 0.47** (IPCC 2006, Vol. 4). You can change both in the panel's boxes.
-- In IPCC, R depends on the stand's above-ground biomass per hectare. Look at the AGB/ha value in the panel and enter the R that fits your site.
-- Trees outside the model's height range have no biomass and are not included in the totals, so the true stock may be higher than shown. The panel says how many trees are left out.
+- **Leave both boxes empty** for the automatic values (IPCC 2006, Vol. 4, temperate forests):
+  - **Roots:** the species' root model where there is one (the panel names it); otherwise R from Table 4.4, which depends on the stand's above-ground biomass per hectare. Until Area is calculated FORA uses the middle class (conifers 0.29, broadleaves 0.23, oak 0.30).
+  - **CF:** 0.51 for conifers, 0.48 for broadleaves (Table 4.3).
+- **Type a value** to override. A typed R is applied to every tree, root models included. **Automatic** clears both boxes.
+- Trees outside the DBH model's height range have no biomass and are not included in the totals, so the true stock may be higher than shown. The panel says how many trees are left out.
 
 > **Important:** These values are **estimates (IPCC methodology) and have not been validated with field measurements.** Formal uses such as carbon credits require field sampling.
 
@@ -282,9 +296,9 @@ A vertical cross-section along that line is drawn below the map, including a 1.3
 
 | What | Where | Contents |
 |---|---|---|
-| **Tree CSV** | Metrics → 📥 CSV | Every tree: height, crown measures (3 methods), coordinates, DBH, your measurements, species, biomass. Carbon columns at the end. Below the table: area metrics (if calculated) and a carbon-method block. |
+| **Tree CSV** | Metrics → 📥 CSV | Every tree: height, crown measures (3 methods), coordinates, DBH, your measurements, species, biomass. Carbon columns, then the biomass model, an out-of-range flag and the source of below-ground biomass at the end. Below the table: area metrics (if calculated) and a carbon-method block (models, coefficients and their sources, model spread). |
 | **Area CSV** | Area → 📥 Area CSV | Area metrics |
-| **PDF report** | Metrics → 📄 PDF | Summary, statistics, height histogram and the parameters used. Area and stem density if Area was calculated; a carbon page if Calabrian pine was applied. |
+| **PDF report** | Metrics → 📄 PDF | Summary, statistics, height histogram and the parameters used. Area and stem density if Area was calculated; a carbon page if biomass was computed. The biomass model, its source and the carbon method are written out. |
 | **Image** | Tools → Save Image | The map (fora_map.png) in 2D view, or the 3D view (fora_3d.png) in 3D |
 
 The PDF report is in English. Turkish letters are written in simplified form (ı → i, ş → s, ğ → g).
@@ -300,7 +314,7 @@ No species has been applied. Pick a species at the top of the Metrics tab and pr
 That tree's height is outside the valid range of the chosen species model. This is not an error; the model is simply not defined for that height.
 
 **The carbon panel does not appear.**
-Carbon is only computed for Calabrian pine. Apply one of the Calabrian pine species. If the panel still does not appear, all trees may be outside the model's range.
+Apply a species first. If the panel still does not appear, all trees may be outside the DBH model's height range.
 
 **Stats is empty.**
 You need field measurements for at least 3 trees. DBH also needs a species to be applied.

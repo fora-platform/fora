@@ -5,6 +5,9 @@ Every model takes tree height (h, m) and, for two species, crown diameter
 equations published in the h = f(d) direction are inverted numerically by
 bisection, so no closed-form rearrangement is required.
 
+The DBH models are in `src/species.js`. Biomass models (134 above-ground, 45 root)
+are described in [BIOMASS_MODELS.md](BIOMASS_MODELS.md).
+
 Two species are shipped as experimental proxies and are flagged `[BETA]` in
 the interface: *Pinus pinea* and *Quercus cerris*. They should not be used for
 quantitative inventory.
@@ -169,6 +172,11 @@ Source: Sönmez T, Kahriman A, Şahin A, Yavuz M. (2016) Biomass equations for
 Calabrian pine in the Mediterranean Region of Turkey. Šumarski List
 140(11-12):569-577. https://doi.org/10.31298/sl.140.11-12.4
 Destructive sampling of 292 trees.
+
+Since v2.0 the total is multiplied by exp(0.363²/2) = 1.068, the usual correction
+for back-transforming a model fitted on the log scale (the paper gives none); the
+components are used as published. This model is one of the 134 above-ground
+models of FORA's biomass library; see [BIOMASS_MODELS.md](BIOMASS_MODELS.md).
 
 ---
 

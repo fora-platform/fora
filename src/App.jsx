@@ -3,7 +3,10 @@ import*as THREE from"three";
 
 import{parseLAS}from"./lasParser.js";
 import{getLasInfo}from"./lasInfo.js";
-import{standCarbon,treeCarbon,CARBON_DEFAULTS}from"./carbon.js";
+import{standCarbon,treeCarbon,IPCC_CF,ipccRootToShoot}from"./carbon.js";
+import{SP,spName}from"./species.js";
+import{MODEL_BY_CODE}from"./biomassLibrary.js";
+import{DEFAULT_SCOPE,SCOPES,SCOPE_LABEL,STATUS_EN,biomassChoice,modelsFor,evalModel,standSpread,SONMEZ_COMPONENTS}from"./modelChoice.js";
 import{buildInventoryPDF}from"./inventoryReport.js";
 import{isLaz,makeLazToLas}from"./lazLoader.js";
 import lazWasmUrl from"laz-perf/lib/web/laz-perf.wasm?url";
@@ -207,80 +210,9 @@ const dx=px-x0,dy=py-y0,w=dtm.w,v00=dtm.data[y0*w+x0],v10=dtm.data[y0*w+x1],v01=
 if(!isFinite(v00)||!isFinite(v10)||!isFinite(v01)||!isFinite(v11)){const c=[v00,v10,v01,v11].filter(isFinite);out[i]=c.length?pts.z[i]-c.reduce((a,b)=>a+b)/c.length:NaN;}
 else{const a=v00*(1-dx)+v10*dx,b=v01*(1-dx)+v11*dx,g=a*(1-dy)+b*dy;out[i]=pts.z[i]-g;}}return out;}
 
-// Species-specific allometric models — published coefficients
-// All formulas return DBH in cm given H in m and CD in m
-// Inverse-solving used for pure h-d models (Gompertz, Schnute, Prodan)
-const SP=[
-  // Gencal (2025) PhD thesis + Karahalil & Karsli (2017,)
-  {id:"ps",nameTR:"Sarıçam (P. sylvestris)",nameEN:"Scots pine (P. sylvestris)",ref:"Gencal 2025",fn:(h,cd)=>Math.max(0,-5.22+1.65*h+2.35*cd)},
-  {id:"ab",nameTR:"Göknar (A. bornmuelleriana)",nameEN:"Uludağ fir (A. bornmuelleriana)",ref:"Gencal 2025",fn:(h,cd)=>Math.max(0,-6.27+1.80*h+2.06*cd)},
-  // Özçelik et al. (2014) DOI:10.3906/TAR-1304-115 — Gompertz, inverse-solved for d
-  // Formula: h = 1.3 + a·exp(-b·exp(-c·d))  →  d = -ln(-ln((h-1.3)/a)/b)/c
-  {id:"pb_me",nameTR:"Kızılçam-Sahil (P. brutia ME)",nameEN:"Calabrian pine – coastal (P. brutia ME)",ref:"Özçelik 2014",fn:(h,cd)=>{const a=22.527,b=1.823,c=0.062;if(h<=1.3||h>=a+1.3)return NaN;const inner=(h-1.3)/a;if(inner<=0||inner>=1)return NaN;const lni=-Math.log(inner)/b;if(lni<=0)return NaN;return Math.max(0,-Math.log(lni)/c);}},
-  {id:"pb_ie",nameTR:"Kızılçam-İç (P. brutia IE)",nameEN:"Calabrian pine – inland (P. brutia IE)",ref:"Özçelik 2014",fn:(h,cd)=>{const a=25.911,b=2.004,c=0.045;if(h<=1.3||h>=a+1.3)return NaN;const inner=(h-1.3)/a;if(inner<=0||inner>=1)return NaN;const lni=-Math.log(inner)/b;if(lni<=0)return NaN;return Math.max(0,-Math.log(lni)/c);}},
-  {id:"pb_le",nameTR:"Kızılçam-Göl (P. brutia LE)",nameEN:"Calabrian pine – lake district (P. brutia LE)",ref:"Özçelik 2014",fn:(h,cd)=>{const a=24.207,b=1.465,c=0.038;if(h<=1.3||h>=a+1.3)return NaN;const inner=(h-1.3)/a;if(inner<=0||inner>=1)return NaN;const lni=-Math.log(inner)/b;if(lni<=0)return NaN;return Math.max(0,-Math.log(lni)/c);}},
-  // Özçelik et al. (2014) — Pinus nigra Gompertz (Akdeniz sahil)
-  {id:"pn",nameTR:"Karaçam (P. nigra)",nameEN:"Black pine (P. nigra)",ref:"Özçelik 2014",fn:(h,cd)=>{const a=23.494,b=2.397,c=0.067;if(h<=1.3||h>=a+1.3)return NaN;const inner=(h-1.3)/a;if(inner<=0||inner>=1)return NaN;const lni=-Math.log(inner)/b;if(lni<=0)return NaN;return Math.max(0,-Math.log(lni)/c);}},
-  // Ercanli (2015) DOI:10.5154/R.RCHSCFA.2015.02.006 — Schnute, Kestel-Bursa
-  // Assumes H_dom = max(H+1, 10) m and D_dom = 35 cm; inverse-solved numerically
-  {id:"fo",nameTR:"Kayın (F. orientalis)",nameEN:"Oriental beech (F. orientalis)",ref:"Ercanli 2015 (Kestel-Bursa)",fn:(h,cd)=>{const a=1.659,b=0.051,H0=Math.max(h+1,10),D0=35;let lo=0.1,hi=150;for(let i=0;i<40;i++){const d=(lo+hi)/2;const num=1-Math.exp(-b*d),den=1-Math.exp(-b*D0);const hPred=Math.pow(Math.pow(1.3,a)+(Math.pow(H0,a)-Math.pow(1.3,a))*num/den,1/a);if(hPred<h)lo=d;else hi=d;}return Math.max(0,(lo+hi)/2);}},
-  // Carus & Akguş (2018) DOI:10.18182/tjf.338311 — Prodan 1968 rational (m8)
-  // h = 1.30 + d² / (a + b·d + c·d²)
-  // Tarsus region afforestation stands, n=5885 trees, Çizelge 4 (model dev dataset)
-  // Verified: d=25.7 → h=8.54 (paper mean 8.4) — PHYSICALLY VALID
-  // Inverse solved numerically via bisection on h
-  {id:"pp",nameTR:"Fıstıkçamı (P. pinea)",nameEN:"Stone pine (P. pinea)",ref:"Carus & Akguş 2018 (Tarsus)",fn:(h,cd)=>{
-    if(h<=1.3)return NaN;
-    const a=-8.922602,b=3.254666,c=0.025050;
-    // Find d such that 1.30 + d²/(a + b·d + c·d²) = h
-    let lo=0.5,hi=150;
-    for(let i=0;i<60;i++){
-      const d=(lo+hi)/2;
-      const den=a+b*d+c*d*d;
-      if(den<=0){lo=d;continue;}
-      const hPred=1.30+d*d/den;
-      if(isNaN(hPred)||hPred<h)lo=d;else hi=d;
-    }
-    return Math.max(0,(lo+hi)/2);
-  }},
-  // Cimini & Salvati (2011) — Q. cerris GADA site-index model, central Italy
-  // h = Hdom · [(1-exp(b1·d))^b2 / (1-exp(b1·Ddom))^b2]
-  // b1=-0.046, b2=0.650; defaults Hdom=25m, Ddom=40cm for mature Mediterranean stand
-  // Proxy for Turkish Q. cerris (published Turkish coefs not yet available)
-  {id:"qc",nameTR:"Meşe (Q. cerris) [BETA]",nameEN:"Turkey oak (Q. cerris) [BETA]",ref:"Cimini & Salvati 2011 (proxy)",experimental:true,fn:(h,cd)=>{
-    if(h<=1.3)return NaN;
-    const b1=-0.046,b2=0.650,Hdom=25,Ddom=40;
-    const den=Math.pow(1-Math.exp(b1*Ddom),b2);
-    // Find d such that Hdom · (1-exp(b1·d))^b2 / den = h
-    let lo=0.5,hi=150;
-    for(let i=0;i<60;i++){
-      const d=(lo+hi)/2;
-      const term=1-Math.exp(b1*d);
-      if(term<=0){lo=d;continue;}
-      const hPred=Hdom*Math.pow(term,b2)/den;
-      if(isNaN(hPred)||hPred<h)lo=d;else hi=d;
-    }
-    return Math.max(0,(lo+hi)/2);
-  }}
-];
-
-// Biomass models — Sönmez, Kahriman, Şahin, Yavuz (2016) for Pinus brutia
-// Šumarski List 140(11-12), DOI:10.31298/SL.140.11-12.4
-// Returns dry biomass in kg given DBH (d, cm) and height (h, m)
-const BIOMASS={
-  "pb":{
-    branches:(d,h)=>Math.exp(-2.611+1.069*Math.log(d)+0.950*Math.log(h)),
-    bark:(d,h)=>Math.exp(-3.254+1.314*Math.log(d)+0.878*Math.log(h)),
-    stem:(d,h)=>Math.exp(-3.107+9.480*(d/(d+9.499))+0.070*h),
-    needles:(d,h)=>Math.exp(-1.152+6.483*(d/(d+25.940))-0.017*h),
-    total:(d,h)=>Math.exp(-0.770+7.829*(d/(d+12.843))+0.056*h)
-  }
-};
 const CL=["#e6194b","#3cb44b","#ffe119","#4363d8","#f58231","#911eb4","#42d4f4","#f032e6","#bfef45","#fabed4","#469990","#dcbeff","#9A6324","#800000","#aaffc3","#808000"];
 function hC(t){return[t<.5?0:(t-.5)*2,t<.5?t*2:(1-t)*2,t<.5?(.5-t)*2:0];}
 function nS(r){if(r<=0)return 1;const raw=r/6,mg=10**Math.floor(Math.log10(raw)),n=raw/mg;return(n<1.5?1:n<3.5?2:n<7.5?5:10)*mg;}
-// species display name in the current UI language
-const spName=(s,L)=>s?(L?s.nameTR:s.nameEN):"";
 function dlF(blob,name){const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(url),1000);}
 
 // --- citation ---
@@ -313,13 +245,13 @@ const[data,setData]=useState(null);const[zN,setZN]=useState(null);const[bnd,setB
 const[cc,setCC]=useState(null);const[cr,setCR]=useState(15);const[cs,setCS]=useState("circle");
 const[clp,setClp]=useState(null);const[clpZ,setClpZ]=useState(null);const[clpB,setClpB]=useState(null);
 const[segs,setSegs]=useState(null);const[met,setMet]=useState(null);const[areaMet,setAreaMet]=useState(null);const[areaErr,setAreaErr]=useState("");
-const[sel,setSel]=useState(null);const[sp,setSp]=useState("ps");const[cMode,setCMode]=useState("height");const[view,setView]=useState("2d");
+const[sel,setSel]=useState(null);const[sp,setSp]=useState("ps");const[bScope,setBScope]=useState(DEFAULT_SCOPE);const[bCode,setBCode]=useState("");const[bInfo,setBInfo]=useState(null);const[cMode,setCMode]=useState("height");const[view,setView]=useState("2d");
 const[ptSz,setPtSz]=useState(1.5);const[ptPct,setPtPct]=useState(100);const[sCell,setSCell]=useState(0.5);const[sMinH,setSMinH]=useState(2);const[sSR,setSSR]=useState(3);
 const[vwsMode,setVwsMode]=useState(false);const[vwsPreset,setVwsPreset]=useState("pine");const[crownMode,setCrownMode]=useState("bbox");const[dtmSrc,setDtmSrc]=useState("auto");const[extDTM,setExtDTM]=useState(null);
 const[vwsCustom,setVwsCustom]=useState({mode:"linear",a:2.5,b:0.05,c:0,min:2,max:5});
 const[tab,setTab]=useState("tools");const[theme,setTheme]=useState("dark");const[pan,setPan]=useState({x:0,y:0});const[zoom,setZoom]=useState(1);
 const[tMode,setTMode]=useState(false);const[tP1,setTP1]=useState(null);const[tP2,setTP2]=useState(null);const[tData,setTData]=useState(null);
-const[lasInfo,setLasInfo]=useState(null);const[segP,setSegP]=useState(null);const[vegThr,setVegThr]=useState({g:String(VEG_THRESHOLDS.groundMax),l:String(VEG_THRESHOLDS.lowMax),m:String(VEG_THRESHOLDS.mediumMax)});const[cOpt,setCOpt]=useState({cf:String(CARBON_DEFAULTS.carbonFraction),r:String(CARBON_DEFAULTS.rootToShoot)});const[showLaz,setShowLaz]=useState(false);const[showCite,setShowCite]=useState(false);const[citeCopied,setCiteCopied]=useState(false);
+const[lasInfo,setLasInfo]=useState(null);const[segP,setSegP]=useState(null);const[vegThr,setVegThr]=useState({g:String(VEG_THRESHOLDS.groundMax),l:String(VEG_THRESHOLDS.lowMax),m:String(VEG_THRESHOLDS.mediumMax)});const[cOpt,setCOpt]=useState({cf:"",r:""});const[showLaz,setShowLaz]=useState(false);const[showCite,setShowCite]=useState(false);const[citeCopied,setCiteCopied]=useState(false);
 const topR=useRef(null),sideR=useRef(null),transR=useRef(null),threeR=useRef(null),cleanR=useRef(null);
 const dragR=useRef({on:false,moved:false,sx:0,sy:0,px:0,py:0});
 const dR=useRef(),zR=useRef(),cR=useRef(),czR=useRef(),mR=useRef();
@@ -375,12 +307,23 @@ const hArea=useCallback(()=>{const pts=cR.current||dR.current,za=czR.current||zR
 // pass ROI geometry so density uses the true area, not the bounding box
 const roi=(clp&&cc)?{shape:cs,r:cr}:null;
 const r=makeArea(pts,za,m,roi);if(typeof r==="string"){setAreaErr(r);setAreaMet(null);}else{setAreaMet(r);setAreaErr("");}setMsg("");},[clp,cc,cs,cr]);
-// carbon (IPCC): invalid inputs fall back to the defaults, and the panel says so
-const cfIn=parseFloat(cOpt.cf),rIn=parseFloat(cOpt.r),cfOk=cfIn>0&&cfIn<=1,rOk=rIn>=0&&rIn<=2;
-const cfV=cfOk?cfIn:CARBON_DEFAULTS.carbonFraction,rV=rOk?rIn:CARBON_DEFAULTS.rootToShoot;
-const carb=useMemo(()=>met&&met.some(m=>m.bm_total>0)?standCarbon(met,{carbonFraction:cfV,rootToShoot:rV,areaHa:areaMet?areaMet.area/10000:null}):null,[met,cfV,rV,areaMet]);
-const hSp=useCallback(()=>{if(!met)return;const s=SP.find(x=>x.id===sp);const bioKey=sp.startsWith("pb")?"pb":null;const bio=bioKey?BIOMASS[bioKey]:null;setMet(prev=>prev.map(m=>{const d=s?s.fn(m.h,m.cd):null;const bioOut=(bio&&d&&d>0&&m.h>0)?{bm_total:bio.total(d,m.h),bm_stem:bio.stem(d,m.h),bm_branch:bio.branches(d,m.h),bm_bark:bio.bark(d,m.h),bm_needle:bio.needles(d,m.h)}:{bm_total:null,bm_stem:null,bm_branch:null,bm_bark:null,bm_needle:null};return{...m,dbhModel:d,species:s?.nameEN,speciesId:s?.id,...bioOut};}));},[met,sp]);
-const hCSV=useCallback(()=>{if(!met)return;const cr=m=>{if(!(m.bm_total>0))return",,";const c=treeCarbon(m.bm_total,{carbonFraction:cfV,rootToShoot:rV});return c.bgbKg.toFixed(1)+","+c.carbonKg.toFixed(1)+","+c.co2eqKg.toFixed(1);};let csv="ID,H_auto,CD_auto,CPA,CD_bbox,CD_convex,CD_concave,CPA_bbox,CPA_convex,CPA_concave,CrownMethod,CenterX,CenterY,DBH_model,H_manual,CD_manual,DBH_manual,Species,Biomass_total_kg,Biomass_stem_kg,Biomass_branch_kg,Biomass_bark_kg,Biomass_needle_kg,Points,BGB_kg,Carbon_kgC,CO2eq_kg\n";csv+=met.map(m=>`${m.id},${m.h.toFixed(2)},${m.cd.toFixed(2)},${m.cpa.toFixed(2)},${m.cdBbox?.toFixed(2)||""},${m.cdConvex?.toFixed(2)||""},${m.cdConcave?.toFixed(2)||""},${m.cpaBbox?.toFixed(2)||""},${m.cpaConvex?.toFixed(2)||""},${m.cpaConcave?.toFixed(2)||""},${m.crownMethod||""},${m.cx.toFixed(2)},${m.cy.toFixed(2)},${Number.isFinite(m.dbhModel)?m.dbhModel.toFixed(1):""},${m.hManual||""},${m.cdManual||""},${m.dbhManual||""},${m.species||""},${m.bm_total?.toFixed(2)||""},${m.bm_stem?.toFixed(2)||""},${m.bm_branch?.toFixed(2)||""},${m.bm_bark?.toFixed(2)||""},${m.bm_needle?.toFixed(2)||""},${m.cnt},${cr(m)}`).join("\n");if(areaMet)csv+="\n\nAREA_METRICS\n"+Object.entries(areaMet).map(([k,v])=>`${k},${typeof v==="number"?v.toFixed(3):v}`).join("\n");if(carb)csv+="\n\nCARBON_ESTIMATE\n"+[["status","estimated (IPCC methodology) - not validated with field measurements"],["agb_source","Sönmez et al. 2016 (Pinus brutia)"],["coefficients_source","IPCC 2006 Guidelines Vol.4"],["root_to_shoot",rV],["carbon_fraction",cfV],["co2_ratio","44/12 (3.6667)"],["trees_with_biomass",carb.treesWithBiomass],["trees_total",met.length],["agb_t",carb.agb_t.toFixed(3)],["bgb_t",carb.bgb_t.toFixed(3)],["carbon_tC",carb.carbon_tC.toFixed(3)],["co2eq_tCO2",carb.co2eq_tCO2.toFixed(3)]].map(([k,v])=>k+","+v).join("\n");dlF(new Blob(["\uFEFF"+csv],{type:"text/csv"}),"fora_tree_metrics.csv");},[met,areaMet,carb,cfV,rV]);
+// carbon (IPCC): empty fields = automatic (IPCC 2006 tables for the species group; root models where the species has one);
+// a typed value overrides; invalid values fall back to automatic, and the panel says so
+const cfSet=cOpt.cf.trim()!=="",rSet=cOpt.r.trim()!=="",cfIn=parseFloat(cOpt.cf),rIn=parseFloat(cOpt.r),cfOk=!cfSet||(cfIn>0&&cfIn<=1),rOk=!rSet||(rIn>=0&&rIn<=2);
+const bGroup=bInfo?.group||"conifer",areaHa=areaMet?areaMet.area/10000:null;
+const agbHa=useMemo(()=>{if(!met||!areaHa)return null;let s=0;for(const m of met)if(m.bm_total>0)s+=m.bm_total;return s/1000/areaHa;},[met,areaHa]);
+const rAuto=ipccRootToShoot(bGroup,agbHa),cfAuto=IPCC_CF[bGroup]||IPCC_CF.conifer;
+const rUser=rSet&&rOk,cfUser=cfSet&&cfOk,cfV=cfUser?cfIn:cfAuto.value,rV=rUser?rIn:rAuto.value,useRootModel=!rUser;
+const carb=useMemo(()=>met&&met.some(m=>m.bm_total>0)?standCarbon(met,{carbonFraction:cfV,rootToShoot:rV,useRootModel,areaHa}):null,[met,cfV,rV,useRootModel,areaHa]);
+const bSpread=useMemo(()=>bInfo&&met?standSpread(met,bInfo.species):null,[met,bInfo]);
+const hSp=useCallback(()=>{if(!met)return;const s=SP.find(x=>x.id===sp);const ch=biomassChoice(sp,bScope,bCode||null);const mdl=ch?.model||null,rt=ch?.root||null;
+setMet(prev=>prev.map(m=>{const d=s?s.fn(m.h,m.cd):null;const bio={bm_total:null,bm_stem:null,bm_branch:null,bm_bark:null,bm_needle:null,bm_model:null,bm_oor:false,bgb_model:null};
+if(mdl){const e=evalModel(mdl,d,m.h,m.cd);if(e.value!=null){bio.bm_total=e.value;bio.bm_model=mdl.code;bio.bm_oor=e.oor;
+if(mdl.code==="SON-T"){const c=SONMEZ_COMPONENTS;bio.bm_stem=c.stem(d,m.h);bio.bm_branch=c.branches(d,m.h);bio.bm_bark=c.bark(d,m.h);bio.bm_needle=c.needles(d,m.h);}
+if(rt){const r=evalModel(rt,d,m.h,m.cd);bio.bgb_model=r.value;}}}
+return{...m,dbhModel:d,species:s?.nameEN,speciesId:s?.id,...bio};}));
+setBInfo(ch?{species:sp,group:ch.group,scope:ch.scope,requested:ch.requested,fallback:ch.fallback,model:mdl.code,root:rt?.code||null,rootPaired:ch.rootPaired}:null);},[met,sp,bScope,bCode]);
+const hCSV=useCallback(()=>{if(!met)return;const q=v=>`"${String(v??"").replace(/"/g,'""')}"`;const rootOf=m=>useRootModel&&Number.isFinite(m.bgb_model)&&m.bgb_model>=0;const cr=m=>{if(!(m.bm_total>0))return",,";const c=treeCarbon(m.bm_total,{carbonFraction:cfV,rootToShoot:rV,bgbKg:rootOf(m)?m.bgb_model:undefined});return c.bgbKg.toFixed(1)+","+c.carbonKg.toFixed(1)+","+c.co2eqKg.toFixed(1);};const bx=m=>m.bm_model?`${m.bm_model},${m.bm_oor?"yes":"no"},${rootOf(m)?bInfo?.root:"R="+rV}`:",,";let csv="ID,H_auto,CD_auto,CPA,CD_bbox,CD_convex,CD_concave,CPA_bbox,CPA_convex,CPA_concave,CrownMethod,CenterX,CenterY,DBH_model,H_manual,CD_manual,DBH_manual,Species,Biomass_total_kg,Biomass_stem_kg,Biomass_branch_kg,Biomass_bark_kg,Biomass_needle_kg,Points,BGB_kg,Carbon_kgC,CO2eq_kg,Biomass_model,Biomass_out_of_range,BGB_source\n";csv+=met.map(m=>`${m.id},${m.h.toFixed(2)},${m.cd.toFixed(2)},${m.cpa.toFixed(2)},${m.cdBbox?.toFixed(2)||""},${m.cdConvex?.toFixed(2)||""},${m.cdConcave?.toFixed(2)||""},${m.cpaBbox?.toFixed(2)||""},${m.cpaConvex?.toFixed(2)||""},${m.cpaConcave?.toFixed(2)||""},${m.crownMethod||""},${m.cx.toFixed(2)},${m.cy.toFixed(2)},${Number.isFinite(m.dbhModel)?m.dbhModel.toFixed(1):""},${m.hManual||""},${m.cdManual||""},${m.dbhManual||""},${m.species||""},${m.bm_total?.toFixed(2)||""},${m.bm_stem?.toFixed(2)||""},${m.bm_branch?.toFixed(2)||""},${m.bm_bark?.toFixed(2)||""},${m.bm_needle?.toFixed(2)||""},${m.cnt},${cr(m)},${bx(m)}`).join("\n");if(areaMet)csv+="\n\nAREA_METRICS\n"+Object.entries(areaMet).map(([k,v])=>`${k},${typeof v==="number"?v.toFixed(3):v}`).join("\n");if(carb)csv+="\n\nCARBON_ESTIMATE\n"+[["status","estimated (IPCC methodology) - not validated with field measurements"],...(bInfo?(()=>{const m=modelsFor(bInfo.species).find(x=>x.code===bInfo.model);return[["agb_model",bInfo.model],["agb_source",q(m?.source)],["agb_status",q(STATUS_EN[m?.status]||m?.status)],["model_scope",q(SCOPE_LABEL[bInfo.scope].en+(bInfo.fallback?` (no ${SCOPE_LABEL[bInfo.requested].en} model for this species)`:""))],["root_model",useRootModel&&bInfo.root?bInfo.root:"none"],["trees_with_root_model",carb.treesWithRootModel]];})():[]),["coefficients_source","IPCC 2006 Guidelines Vol.4 (Tables 4.3 and 4.4)"],["root_to_shoot",rV],["root_to_shoot_source",q(rUser?"user value":rAuto.label)],["carbon_fraction",cfV],["carbon_fraction_source",q(cfUser?"user value":cfAuto.label)],...(bSpread&&bSpread.n>1?[["model_spread_agb_t",q(`${bSpread.min_t.toFixed(3)} to ${bSpread.max_t.toFixed(3)} (${bSpread.n} models)`)]]:[]),["co2_ratio","44/12 (3.6667)"],["trees_with_biomass",carb.treesWithBiomass],["trees_total",met.length],["agb_t",carb.agb_t.toFixed(3)],["bgb_t",carb.bgb_t.toFixed(3)],["carbon_tC",carb.carbon_tC.toFixed(3)],["co2eq_tCO2",carb.co2eq_tCO2.toFixed(3)]].map(([k,v])=>k+","+v).join("\n");dlF(new Blob(["\uFEFF"+csv],{type:"text/csv"}),"fora_tree_metrics.csv");},[met,areaMet,carb,cfV,rV,useRootModel,bInfo,rUser,cfUser,rAuto,cfAuto,bSpread]);
 const hPDF=useCallback(async()=>{if(!met)return;setMsg(L?"PDF hazırlanıyor...":"Building PDF...");
 try{const{jsPDF}=await import("jspdf");
 const ap=SP.find(s=>s.id===met.find(m=>m.speciesId)?.speciesId);
@@ -389,9 +332,16 @@ const win=segP?(segP.vws?(segP.custom?`variable window, custom ${segP.custom.mod
 const methodLines=[segP?`Segmentation: CHM cell ${segP.cell} m, min. tree height ${segP.minH} m, ${win}; crown outline: ${CROWN[segP.crown]||segP.crown}`:null,`Ground: ${dtmSrc==="external"?"external DTM":"automatic (grid min-Z)"}`].filter(Boolean);
 const AREA_SRC={circle:"clip circle",rect:"clip rectangle",bbox:"bounding box"};
 const base=(lasInfo?.fileName||"").replace(/\.(las|laz)$/i,"");
-const doc=buildInventoryPDF(met,{projectName:base||"FORA inventory",fileName:lasInfo?.fileName,areaHa:areaMet?areaMet.area/10000:null,areaSource:areaMet?AREA_SRC[areaMet.area_source]:null,species:ap?`${ap.nameEN}, ${ap.ref}`:null,methodLines,carbon:carb},jsPDF);
+const bm=bInfo?MODEL_BY_CODE[bInfo.model]:null,rm=bInfo?.root?MODEL_BY_CODE[bInfo.root]:null,nOor=met.filter(m=>m.bm_oor).length;
+const rng=r=>r?`${r[0]}–${r[1]}`:"not reported";
+const biomassLines=bm?[`Biomass model: ${bm.code}, ${bm.source} (${STATUS_EN[bm.status]||bm.status}); scope: ${SCOPE_LABEL[bInfo.scope].en}${bInfo.fallback?` (no ${SCOPE_LABEL[bInfo.requested].en} model for this species)`:""}; data range DBH ${rng(bm.d)} cm${bm.inputs.includes("h")?`, height ${rng(bm.h)} m`:""}${bm.cf?`; log-scale correction ${bm.cf} applied by FORA`:""}.`,nOor?`${nOor} trees are outside the biomass model's data range (biomass extrapolated).`:null].filter(Boolean):[];
+const carbonMethod=carb?(`Method: above-ground biomass (AGB) from ${bm?`${bm.code} (${bm.source})`:"the species model"}. `+
+(useRootModel&&rm?`Below-ground biomass (BGB) from the root model ${rm.code} (${rm.source}) for ${carb.treesWithRootModel} trees${carb.treesWithRootModel<carb.treesWithBiomass?`; the others AGB x ${rV} (${rAuto.label})`:""}. `:`BGB = AGB x ${rV} (root-to-shoot; ${rUser?"user value":rAuto.label}). `)+
+`Carbon = (AGB + BGB) x ${cfV} (carbon fraction; ${cfUser?"user value":cfAuto.label}). CO2 equivalent = carbon x 44/12. IPCC 2006 Guidelines, Vol. 4. `+
+(bSpread&&bSpread.n>1?`Across the ${bSpread.n} biomass models in FORA's library that fit this species, stand AGB ranges from ${bSpread.min_t.toFixed(2)} to ${bSpread.max_t.toFixed(2)} t. `:"")):null;
+const doc=buildInventoryPDF(met,{projectName:base||"FORA inventory",fileName:lasInfo?.fileName,areaHa:areaMet?areaMet.area/10000:null,areaSource:areaMet?AREA_SRC[areaMet.area_source]:null,species:ap?`${ap.nameEN}, ${ap.ref}`:null,methodLines:[...methodLines,...biomassLines],carbon:carb,carbonMethod},jsPDF);
 doc.save(`${base||"fora"}_inventory.pdf`);setMsg("");}
-catch(err){console.error(err);setMsg((L?"⚠ PDF oluşturulamadı: ":"⚠ PDF failed: ")+err.message);}},[met,lasInfo,areaMet,carb,segP,dtmSrc,L]);
+catch(err){console.error(err);setMsg((L?"⚠ PDF oluşturulamadı: ":"⚠ PDF failed: ")+err.message);}},[met,lasInfo,areaMet,carb,segP,dtmSrc,L,bInfo,bSpread,useRootModel,rV,cfV,rUser,cfUser,rAuto,cfAuto]);
 const hAreaCSV=useCallback(()=>{if(!areaMet)return;let csv="Metric,Value\n";Object.entries(areaMet).forEach(([k,v])=>{csv+=`${k},${typeof v==="number"?v.toFixed(4):v}\n`;});dlF(new Blob(["\uFEFF"+csv],{type:"text/csv"}),"fora_area_metrics.csv");},[areaMet]);
 const hImg=useCallback(()=>{if(view==="3d"){const el=threeR.current;if(!el)return;const wc=el.querySelector("canvas");if(!wc)return;try{const url=wc.toDataURL("image/png");const a=document.createElement("a");a.href=url;a.download="fora_3d.png";document.body.appendChild(a);a.click();document.body.removeChild(a);}catch(err){setMsg("Export failed");}
 }else{const cv=topR.current;if(!cv)return;const W=cv.width,H=cv.height;const tmp=document.createElement("canvas");tmp.width=W;tmp.height=H;const ctx=tmp.getContext("2d");ctx.drawImage(cv,0,0);
@@ -744,15 +694,16 @@ return(
 </Sc>)}
 
 {tab==="metrics"&&(<Sc t={L?"Ağaç Metrikleri":"Tree Metrics"}>{!met?<div style={{fontSize:10,color:txD}}>{L?"Segmentasyon yapın":"Run seg"}</div>:(<>
-<div style={{display:"flex",gap:4,marginBottom:4}}><select style={{...IN,flex:1,width:"auto",minWidth:0}} value={sp} onChange={e=>setSp(e.target.value)}>{SP.map(s=><option key={s.id} value={s.id}>{spName(s,L)}</option>)}</select><button style={BT(true)} onClick={hSp}>{L?"Uygula":"Apply"}</button></div>
+<div style={{display:"flex",gap:4,marginBottom:4}}><select style={{...IN,flex:1,width:"auto",minWidth:0}} value={sp} onChange={e=>{setSp(e.target.value);setBCode("");}}>{SP.map(s=><option key={s.id} value={s.id}>{spName(s,L)}</option>)}</select><button style={BT(true)} onClick={hSp}>{L?"Uygula":"Apply"}</button></div>
 {(()=>{const apId=met.find(m=>m.speciesId)?.speciesId,ap=SP.find(s=>s.id===apId),oor=ap?met.filter(m=>!Number.isFinite(m.dbhModel)).length:0;return(<>
 {ap&&<div style={{fontSize:9,color:txM,marginBottom:4}}>{L?"Uygulanan tür: ":"Applied species: "}<span style={{color:gn2}}>{spName(ap,L)}</span>{ap.id!==sp&&<span style={{color:og}}>{L?" · seçim değişti, Uygula'ya basın":" · selection changed, press Apply"}</span>}</div>}
+{ap&&bInfo&&<div style={{fontSize:9,color:txM,marginBottom:4}}>{L?"Biyokütle modeli: ":"Biomass model: "}<span style={{color:gn2}}>{bInfo.model}</span> · {SCOPE_LABEL[bInfo.scope][L?"tr":"en"]}{(()=>{const n=met.filter(m=>m.bm_oor).length;return n>0?<span style={{color:og}}>{L?` · ${n} ağaç modelin veri aralığı dışında (dışkestirim)`:` · ${n} trees outside the model's data range (extrapolated)`}</span>:null;})()}</div>}
 <div style={{fontSize:8,color:txM,marginBottom:6,padding:6,background:ac+"11",border:`1px solid ${ac}33`,borderRadius:4,lineHeight:1.4}}>{L?"H, CD ve DBH₁: FORA'nın otomatik tahminleri. H₂, CD₂ ve DBH₂: sahada ölçtüğünüz değerler (isteğe bağlı), İstat sekmesinde karşılaştırılır.":"H, CD and DBH₁: FORA's automatic estimates. H₂, CD₂ and DBH₂: your field measurements (optional), compared in the Stats tab."}</div>
 {!ap&&<div style={{fontSize:9,color:og,marginBottom:6,padding:"4px 6px",background:og+"11",borderRadius:4,lineHeight:1.4}}>{L?"DBH₁ boş: yukarıdan tür seçip Uygula'ya basın.":"DBH₁ is empty: pick a species above and press Apply."}</div>}
 {oor>0&&<div style={{fontSize:9,color:og,marginBottom:6,padding:"4px 6px",background:og+"11",borderRadius:4,lineHeight:1.4}}>{L?`${oor} ağacın boyu bu türün modelinin geçerli aralığı dışında; DBH₁ (ve biyokütle) hesaplanamadı (–).`:`${oor} trees are outside this species model's height range; DBH₁ (and biomass) not computed (–).`}</div>}
 {met.length>200&&<div style={{fontSize:8,color:txD,marginBottom:4}}>{L?`İlk 200 ağaç gösteriliyor; CSV'de ${met.length} ağacın tümü var.`:`Showing the first 200 trees; the CSV has all ${met.length}.`}</div>}
 </>);})()}
-<div style={{overflowX:"auto"}}><button style={{...BT(true),marginBottom:6,fontSize:9}} onClick={hCSV}>📥 CSV</button> <button style={{...BT(true),marginBottom:6,fontSize:9}} onClick={hPDF} title={L?"Envanter raporu (İngilizce). Alan hesaplandıysa alan ve ağaç yoğunluğu, Kızılçam uygulandıysa karbon sayfası eklenir.":"Inventory report. Includes area and stem density if Area was calculated, and a carbon page if Calabrian pine was applied."}>📄 PDF</button>
+<div style={{overflowX:"auto"}}><button style={{...BT(true),marginBottom:6,fontSize:9}} onClick={hCSV}>📥 CSV</button> <button style={{...BT(true),marginBottom:6,fontSize:9}} onClick={hPDF} title={L?"Envanter raporu (İngilizce). Alan hesaplandıysa alan ve ağaç yoğunluğu, biyokütle hesaplandıysa karbon sayfası eklenir.":"Inventory report. Includes area and stem density if Area was calculated, and a carbon page if biomass was computed."}>📄 PDF</button>
 <table style={{width:"100%",borderCollapse:"collapse",fontSize:8}}><thead><tr>{[["#",L?"Ağaç no":"Tree ID"],["H",L?"Otomatik boy (m)":"Auto height (m)"],["CD",L?"Otomatik taç çapı (m)":"Auto crown diameter (m)"],["X",L?"Taç merkezi X (dosya koordinatı)":"Crown centre X (file CRS)"],["Y",L?"Taç merkezi Y (dosya koordinatı)":"Crown centre Y (file CRS)"],["DBH₁",L?"Model DBH tahmini (cm), tür seçip Uygula'ya basınca dolar":"Modelled DBH (cm), fills after you pick a species and press Apply"],["DBH₂",L?"Sahada ölçülen DBH (cm), elle girilir":"Field-measured DBH (cm), entered by hand"],["H₂",L?"Sahada ölçülen boy (m), elle girilir":"Field-measured height (m), entered by hand"],["CD₂",L?"Sahada ölçülen taç çapı (m), elle girilir":"Field-measured crown diameter (m), entered by hand"],["N",L?"Ağaca ait nokta sayısı":"Points in the tree"]].map(([h,t])=><th key={h} title={t} style={{textAlign:"left",padding:"2px",borderBottom:`1px solid ${bd}`,color:txD,fontWeight:500,cursor:"help"}}>{h}</th>)}</tr></thead>
 <tbody>{met.slice(0,200).map((m,i)=>(<tr key={m.id} style={{background:sel===m.id?ac+"15":i%2===0?"transparent":bd+"22",cursor:"pointer"}} onClick={()=>{setSel(sel===m.id?null:m.id);setCMode("segment");}}>
 <td style={{padding:"2px",color:CL[(m.id-1)%CL.length],fontWeight:700}}>{m.id}</td><td style={{padding:"2px"}}>{m.h.toFixed(1)}</td><td style={{padding:"2px"}}>{m.cd.toFixed(1)}</td>
@@ -788,10 +739,22 @@ const SB=({l,s})=>!s?<div style={{fontSize:9,color:txD,marginBottom:6}}>{l}: min
 return(<><div style={{fontSize:9,color:txD,marginBottom:8}}>{L?"Manuel değer girin":"Enter manual values"}</div>
 <SB l="H" s={cSt(wH.map(m=>({a:+m.hManual,b:m.h})))}/><SB l="CD" s={cSt(wC.map(m=>({a:+m.cdManual,b:m.cd})))}/><SB l="DBH" s={cSt(wD.map(m=>({a:+m.dbhManual,b:m.dbhModel})))}/></>);})()}</Sc>)}
 
-{tab==="species"&&(<><Sc t={L?"Tür":"Species"}><select style={{...IN,width:"100%",marginBottom:6}} value={sp} onChange={e=>setSp(e.target.value)}>{SP.map(s=><option key={s.id} value={s.id}>{spName(s,L)}</option>)}</select>
+{tab==="species"&&(<><Sc t={L?"Tür":"Species"}><select style={{...IN,width:"100%",marginBottom:6}} value={sp} onChange={e=>{setSp(e.target.value);setBCode("");}}>{SP.map(s=><option key={s.id} value={s.id}>{spName(s,L)}</option>)}</select>
 <div style={{fontSize:9,color:txD,marginBottom:6,padding:"4px 6px",background:dk,borderRadius:3,borderLeft:`2px solid ${ac}`}}>📖 {SP.find(s=>s.id===sp)?.ref||""}</div>
 {SP.find(s=>s.id===sp)?.experimental&&<div style={{fontSize:9,color:og,marginBottom:6,padding:"4px 6px",background:dk,borderRadius:3,borderLeft:`2px solid ${og}`,fontWeight:600}}>⚠ {L?"BETA: Bu tür için Türkiye-kalibreli katsayılar henüz doğrulanmadı. Sonuçlar yaklaşık — dikkatli kullanın.":"BETA: Turkey-calibrated coefficients not yet verified for this species. Results are approximate — use with caution."}</div>}
-{sp.startsWith("pb")&&<div style={{fontSize:9,color:gn2,marginBottom:6,padding:"4px 6px",background:dk,borderRadius:3,borderLeft:`2px solid ${gn2}`}}>🌲 {L?"Biyokütle: Sönmez et al. 2016":"Biomass: Sönmez et al. 2016"}</div>}
+{(()=>{const lng=L?"tr":"en",ch=biomassChoice(sp,bScope,bCode||null);if(!ch)return null;const m=ch.model,opts=modelsFor(sp,ch.scope),IV={d:"DBH",h:L?"boy":"height",cd:L?"taç çapı":"crown diameter"};
+return(<div style={{marginBottom:6}}>
+<div style={{fontSize:9,color:txD,marginBottom:3}}>{L?"Biyokütle modeli kapsamı":"Biomass model scope"}</div>
+<div style={{display:"flex",gap:3,marginBottom:4}}>{SCOPES.map(sc=>{const n=modelsFor(sp,sc).length;return <button key={sc} disabled={!n} title={n?(L?`${n} model`:`${n} models`):(L?"Bu tür için bu kapsamda model yok":"No model for this species in this scope")} style={{...BT(ch.scope===sc),flex:1,fontSize:8,padding:"2px 3px",opacity:n?1:0.45}} onClick={()=>{setBScope(sc);setBCode("");}}>{SCOPE_LABEL[sc][lng]} ({n})</button>;})}</div>
+{ch.fallback&&<div style={{fontSize:8,color:og,marginBottom:4}}>{L?`${SCOPE_LABEL[bScope].tr} kapsamında bu tür için model yok; ${SCOPE_LABEL[ch.scope].tr} modeli kullanılıyor.`:`No ${SCOPE_LABEL[bScope].en} model for this species; using ${SCOPE_LABEL[ch.scope].en}.`}</div>}
+<select style={{...IN,width:"100%",marginBottom:4}} value={m.code} onChange={e=>setBCode(e.target.value)}>{opts.map((x,i)=><option key={x.code} value={x.code}>{x.code}{i===0?(L?" (önerilen)":" (recommended)"):""} — {x.source.split(/,| vd\.| &/)[0]} {(x.source.match(/\b(19|20)\d\d\b/)||[""])[0]}</option>)}</select>
+<div style={{fontSize:8,color:txM,padding:"4px 6px",background:dk,borderRadius:3,borderLeft:`2px solid ${gn2}`,lineHeight:1.5}}>
+🌲 {m.source}<br/>{L?`${m.species} · ${m.region}`:(m.species.match(/\(([^)]+)\)/)?.[1]||m.species)}<br/>
+{L?"Girdiler: ":"Inputs: "}{m.inputs.map(k=>IV[k]).join(", ")} · DBH {m.d?`${m.d[0]}–${m.d[1]} cm`:(L?"aralık yayımlanmamış":"range not reported")}{m.h&&m.inputs.includes("h")?` · ${IV.h} ${m.h[0]}–${m.h[1]} m`:""}<br/>
+<span style={{color:/dikkat|İkincil|Site|Web/.test(m.status)?og:gn2}}>{L?m.status:(STATUS_EN[m.status]||m.status)}</span>{m.cf?` · ${L?"log düzeltmesi":"log correction"} ×${m.cf}`:""}
+{L&&m.note&&<div style={{color:txD,marginTop:2}}>{m.note}</div>}
+<div style={{color:txD,marginTop:2}}>{L?"Kök: ":"Roots: "}{ch.root?`${ch.root.code} — ${ch.root.source.split(/,| vd\.| &/)[0]}`:(L?"kök modeli yok; IPCC kök/gövde oranı kullanılır":"no root model; the IPCC root-to-shoot ratio is used")}</div>
+</div></div>);})()}
 <button style={{...BT(true),width:"100%"}} onClick={hSp} disabled={!met}>{L?"Uygula":"Apply"}</button></Sc>
 {carb&&<Sc t={L?"Karbon tahmini (IPCC)":"Carbon estimate (IPCC)"}><div style={{fontSize:9,color:txM,lineHeight:1.8}}>
 {[[L?"Biyokütlesi olan ağaç":"Trees with biomass",`${carb.treesWithBiomass} / ${met.length}`],[L?"Yer üstü biyokütle":"Above-ground biomass",`${carb.agb_t.toFixed(2)} t`],[L?"Yer altı biyokütle":"Below-ground biomass",`${carb.bgb_t.toFixed(2)} t`],[L?"Karbon stoku":"Carbon stock",`${carb.carbon_tC.toFixed(2)} t C`],[L?"CO₂ eşdeğeri":"CO₂ equivalent",`${carb.co2eq_tCO2.toFixed(2)} t CO₂e`],
@@ -800,11 +763,16 @@ return(<><div style={{fontSize:9,color:txD,marginBottom:8}}>{L?"Manuel değer gi
 {carb.carbonPerHa_tC==null&&<div style={{fontSize:8,color:txD,marginTop:2}}>{L?"Hektar başına değerler için Alan sekmesinde Hesapla'ya basın.":"For per-hectare values, press Calculate in the Area tab."}</div>}
 {carb.treesWithBiomass<met.length&&<div style={{fontSize:9,color:og,marginTop:6,padding:"4px 6px",background:og+"11",borderRadius:4,lineHeight:1.4}}>{L?`${met.length-carb.treesWithBiomass} ağacın biyokütlesi yok (modelin boy aralığı dışında). Bu ağaçlar toplamlara dahil değil; gerçek stok daha yüksek olabilir.`:`${met.length-carb.treesWithBiomass} trees have no biomass (outside the model's height range). They are not in the totals, so the true stock may be higher.`}</div>}
 <div style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center",fontSize:9,color:txM,marginTop:8}}>
-<label title={L?"Kök/gövde oranı (yer altı / yer üstü biyokütle)":"Root-to-shoot ratio (below- / above-ground biomass)"} style={{display:"flex",alignItems:"center",gap:3}}>{L?"Kök/gövde R":"Root:shoot R"}<input type="number" step="0.01" min="0" max="2" value={cOpt.r} onChange={e=>setCOpt({...cOpt,r:e.target.value})} style={{...IN,width:46,padding:"1px 3px"}}/></label>
-<label title={L?"Kuru biyokütlenin karbon oranı":"Carbon fraction of dry biomass"} style={{display:"flex",alignItems:"center",gap:3}}>{L?"Karbon oranı CF":"Carbon fraction CF"}<input type="number" step="0.01" min="0" max="1" value={cOpt.cf} onChange={e=>setCOpt({...cOpt,cf:e.target.value})} style={{...IN,width:46,padding:"1px 3px"}}/></label>
-{(cOpt.r!==String(CARBON_DEFAULTS.rootToShoot)||cOpt.cf!==String(CARBON_DEFAULTS.carbonFraction))&&<button style={{...BT(false),fontSize:8,padding:"1px 6px"}} onClick={()=>setCOpt({cf:String(CARBON_DEFAULTS.carbonFraction),r:String(CARBON_DEFAULTS.rootToShoot)})}>{L?"Varsayılana dön":"Reset"}</button>}</div>
-{(!cfOk||!rOk)&&<div style={{fontSize:8,color:og,marginTop:2}}>{L?"Geçersiz değer; varsayılan kullanılıyor.":"Invalid value; using the default."}</div>}
-<div style={{fontSize:8,color:txM,marginTop:6,padding:6,background:ac+"11",border:`1px solid ${ac}33`,borderRadius:4,lineHeight:1.4}}>{L?"Yöntem: yer altı = yer üstü × R; karbon = (yer üstü + yer altı) × CF; CO₂e = karbon × 44/12. Yer üstü biyokütle: Sönmez et al. 2016. Varsayılan katsayılar: IPCC 2006, Cilt 4. IPCC'de R, meşcerenin hektar başına yer üstü biyokütlesine göre değişir; bölgenize uygun değeri girin.":"Method: below-ground = above-ground × R; carbon = (above + below) × CF; CO₂e = carbon × 44/12. Above-ground biomass: Sönmez et al. 2016. Default coefficients: IPCC 2006, Vol. 4. In IPCC, R depends on the stand's above-ground biomass per hectare; enter the value that fits your site."}</div>
+<label title={L?"Kök/gövde oranı (yer altı / yer üstü biyokütle). Boş bırakılırsa otomatik: kök modeli olan türde kök modeli, diğerlerinde IPCC 2006 Tablo 4.4. Değer yazarsanız tüm ağaçlara o oran uygulanır.":"Root-to-shoot ratio (below- / above-ground biomass). Empty = automatic: the root model where the species has one, otherwise IPCC 2006 Table 4.4. A typed value is applied to every tree."} style={{display:"flex",alignItems:"center",gap:3}}>{L?"Kök/gövde R":"Root:shoot R"}<input type="number" step="0.01" min="0" max="2" value={cOpt.r} placeholder={String(rAuto.value)} onChange={e=>setCOpt({...cOpt,r:e.target.value})} style={{...IN,width:46,padding:"1px 3px"}}/></label>
+<label title={L?"Kuru biyokütlenin karbon oranı. Boş bırakılırsa otomatik: IPCC 2006 Tablo 4.3 (iğne yapraklı 0.51, geniş yapraklı 0.48).":"Carbon fraction of dry biomass. Empty = automatic: IPCC 2006 Table 4.3 (conifers 0.51, broadleaves 0.48)."} style={{display:"flex",alignItems:"center",gap:3}}>{L?"Karbon oranı CF":"Carbon fraction CF"}<input type="number" step="0.01" min="0" max="1" value={cOpt.cf} placeholder={String(cfAuto.value)} onChange={e=>setCOpt({...cOpt,cf:e.target.value})} style={{...IN,width:46,padding:"1px 3px"}}/></label>
+{(cOpt.r!==""||cOpt.cf!=="")&&<button style={{...BT(false),fontSize:8,padding:"1px 6px"}} onClick={()=>setCOpt({cf:"",r:""})}>{L?"Otomatiğe dön":"Automatic"}</button>}</div>
+{(!cfOk||!rOk)&&<div style={{fontSize:8,color:og,marginTop:2}}>{L?"Geçersiz değer; otomatik değer kullanılıyor.":"Invalid value; using the automatic value."}</div>}
+<div style={{fontSize:8,color:txM,marginTop:6,lineHeight:1.6}}>
+<div>{L?"Yer altı: ":"Below-ground: "}{useRootModel&&bInfo?.root?(L?`kök modeli ${bInfo.root} (${carb.treesWithRootModel} ağaç)${carb.treesWithRootModel<carb.treesWithBiomass?`, diğerleri R = ${rV}`:""}`:`root model ${bInfo.root} (${carb.treesWithRootModel} trees)${carb.treesWithRootModel<carb.treesWithBiomass?`, others R = ${rV}`:""}`):`R = ${rV} (${rUser?(L?"sizin değeriniz":"your value"):(L?rAuto.labelTR:rAuto.label)})`}</div>
+<div>{L?"Karbon oranı: ":"Carbon fraction: "}{cfV} ({cfUser?(L?"sizin değeriniz":"your value"):(L?cfAuto.labelTR:cfAuto.label)})</div>
+{bSpread&&bSpread.n>1&&<div title={bSpread.rows.map(r=>`${r.code}: ${r.agb_t.toFixed(2)} t (${r.trees})`).join("\n")}>{L?`Model aralığı (yer üstü): ${bSpread.min_t.toFixed(2)}–${bSpread.max_t.toFixed(2)} t, bu türe uyan ${bSpread.n} model`:`Model spread (above-ground): ${bSpread.min_t.toFixed(2)}–${bSpread.max_t.toFixed(2)} t across ${bSpread.n} models for this species`}</div>}
+</div>
+<div style={{fontSize:8,color:txM,marginTop:6,padding:6,background:ac+"11",border:`1px solid ${ac}33`,borderRadius:4,lineHeight:1.4}}>{L?"Yöntem: yer altı = kök modeli ya da yer üstü × R; karbon = (yer üstü + yer altı) × CF; CO₂e = karbon × 44/12. Yer üstü biyokütle seçilen modelden (Tür sekmesi). Otomatik katsayılar: IPCC 2006, Cilt 4, Tablo 4.3–4.4 (ılıman ormanlar); R meşcerenin hektar başına yer üstü biyokütlesine göre değişir, alan hesaplanmadıysa orta sınıf kullanılır.":"Method: below-ground = root model or above-ground × R; carbon = (above + below) × CF; CO₂e = carbon × 44/12. Above-ground biomass from the chosen model (Species tab). Automatic coefficients: IPCC 2006, Vol. 4, Tables 4.3–4.4 (temperate forests); R depends on the stand's above-ground biomass per hectare, and the middle class is used until the area is calculated."}</div>
 <div style={{fontSize:8,color:og,marginTop:6,fontWeight:600}}>{L?"Tahmini değerlerdir (IPCC yöntemi); saha ölçümüyle doğrulanmamıştır.":"Estimated values (IPCC methodology); not validated with field measurements."}</div>
 </Sc>}</>)}
 
