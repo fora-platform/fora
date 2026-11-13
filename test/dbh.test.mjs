@@ -15,7 +15,7 @@ import { biomassChoice } from "../src/modelChoice.js";
 const rel = (a, b, tol = 1e-9) => assert.ok(Math.abs(a - b) <= tol * Math.max(1, Math.abs(b)), `${a} != ${b}`);
 
 test("DBH library: every model reproduces the workbook value at h 18 m", () => {
-  assert.equal(DBH_MODELS.length, 27);
+  assert.equal(DBH_MODELS.length, 30);
   for (const m of DBH_MODELS) rel(m.fn(18, m.testCd), m.test);
   assert.equal(new Set([...DBH_MODELS, ...FORA_DBH].map((m) => m.code)).size, DBH_MODELS.length + FORA_DBH.length);
 });
@@ -32,6 +32,11 @@ test("DBH library: models agree with coefficients typed from the papers at other
     ["BAL-D3", (h, c) => (2.225 + 0.377 * c + 0.099 * h) ** 2],
     // Valbuena Rabadán et al. 2016: DBH = -25.381 + 7.1931 sqrt(H) + 14.5527 sqrt(DCl)
     ["VAL", (h, c) => -25.381 + 7.1931 * sq(h) + 14.5527 * sq(c)],
+    // Gencal 2019 (MSc thesis), Eq. 4.10 h = 2.297 d^0.570 and Eq. 4.11 CD = 1.310 + 0.198 d, solved for d;
+    // Sönmez & Gencal 2023, h = exp(3.026 - 8.438/d), solved for d
+    ["GEN19-QCE-H", (h) => (h / 2.297) ** (1 / 0.570)],
+    ["GEN19-QCE-CD", (h, c) => (c - 1.310) / 0.198],
+    ["SON23-QCE-H", (h) => 8.438 / (3.026 - Math.log(h))],
   ];
   for (const [code, f] of cases) {
     for (const [h, c] of [[9, 2.5], [18, 4], [24, 5.5], [28, 7]]) rel(DBH_MODEL_BY_CODE[code].fn(h, c), f(h, c), 1e-9);
@@ -77,6 +82,11 @@ test("mapping: the user's model is used; a code of another species is ignored", 
   assert.equal(dbhChoice("ab", "GEN25-ABN").model.code, "GEN25-ABN");
   assert.equal(dbhChoice("ab", "BAL-D3").model.code, "JUC-S4-21");
   assert.deepEqual(dbhModelsFor("pb", "tr").map((m) => m.code), ["OZC14-PBR-ME", "OZC14-PBR-IE", "OZC14-PBR-LE"]);
+  assert.deepEqual(dbhModelsFor("qc", "tr").map((m) => m.code), ["GEN19-QCE-H", "GEN19-QCE-CD", "SON23-QCE-H"]);
+  // a crown-only model ignores the height range; the S model gives nothing above its asymptote (20.6 m)
+  const cdOnly = evalDbh(DBH_MODEL_BY_CODE["GEN19-QCE-CD"], { h: 30, cd: 6, cdBbox: 6 });
+  assert.ok(cdOnly.value > 0 && cdOnly.oor === false);
+  assert.equal(evalDbh(DBH_MODEL_BY_CODE["SON23-QCE-H"], { h: 22 }).value, null);
 });
 
 test("crown: each model gets the crown measure it was fitted with", () => {

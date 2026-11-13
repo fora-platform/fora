@@ -211,7 +211,7 @@ FORA çapı LiDAR boyundan ve tacından tahmin eder. Önerilen model, varsa Avru
 | Karaçam | BAL-D3 — Balenović vd. 2015 (Hırvatistan) | Özçelik 2014 |
 | Doğu kayını | JUC-S4-20 — Jucker 2017 (ılıman karışık, geniş yapraklı) | Ercanlı 2015 |
 | Fıstıkçamı | JUC-S4-24 — Jucker 2017 | Carus & Akguş 2018 **[BETA]** |
-| Saçlı meşe | CIM11-QCE — Cimini & Salvati 2011 (İtalya) **[BETA]** | — |
+| Saçlı meşe | CIM11-QCE — Cimini & Salvati 2011 (İtalya) **[BETA]** | Gencal 2019 yüksek lisans tezi, Bursa: boydan ya da tepe çapından; Sönmez & Gencal 2023 (yeni) |
 
 - Her model, uydurulduğu **taç ölçüsünü** alır: Jucker ve Balenović ortalama taç çapını (sınır kutusu), Kalliovirta & Tokola en büyük taç çapını, Valbuena taç alanına eşit dairenin çapını. FORA'nın kendi modelleri Araç sekmesinde seçtiğin taç yöntemini kullanmaya devam eder.
 - Kutuda girdiler, veri aralığı ve doğrulama durumu yazar. **Ayrıntı**'yı açınca FORA'nın hesapladığı formül katsayılarıyla birlikte yazar (her model için; ne hesaplanıyorsa o), altında değişkenlerin anlamı, kaynak ve bölge var. Biyokütle modellerinde de aynı. Kızılçamın üç bölge modeli artık ayrı tür değil, Türkiye grubunda üç çap modeli.

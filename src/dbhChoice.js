@@ -60,7 +60,7 @@ export const SPECIES_DBH = {
   pn: { eu: ["BAL-D3"], tr: ["OZC14-PNI"], world: ["JUC-S4-21", "JUC-S4-24", "JUC-D6"] },
   fo: { eu: [], tr: ["ERC15-FOR"], world: ["JUC-S4-20", "JUC-D6"] },
   pp: { eu: [], tr: ["CAR18-PPI"], world: ["JUC-S4-24", "JUC-D6"] },
-  qc: { eu: ["CIM11-QCE"], tr: [], world: ["JUC-S4-20", "JUC-S4-23", "JUC-D6"] },
+  qc: { eu: ["CIM11-QCE"], tr: ["GEN19-QCE-H", "GEN19-QCE-CD", "SON23-QCE-H"], world: ["JUC-S4-20", "JUC-S4-23", "JUC-D6"] },
 };
 
 const key = (sp) => (sp && sp.startsWith("pb") ? "pb" : sp);
@@ -110,7 +110,7 @@ export function evalDbh(model, t) {
   if (usesCrown && c == null) return { value: null, oor: false };
   const v = model.fn(t.h, c);
   if (!Number.isFinite(v) || v <= 0) return { value: null, oor: false };
-  const oor = outside(t.h, model.h) || (usesCrown && outside(c, model.c)) || outside(v, model.d);
+  const oor = (model.inputs.includes("h") && outside(t.h, model.h)) || (usesCrown && outside(c, model.c)) || outside(v, model.d);
   return { value: v, oor };
 }
 

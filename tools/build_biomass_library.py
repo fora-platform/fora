@@ -254,7 +254,7 @@ for m in models:
     lines.append('  {' + ','.join(fields) + '}')
 head = '''// biomassLibrary.js — FORA's allometric biomass model library.
 //
-// GENERATED from FORA_model_kutuphanesi.xlsx (library version 10, 13 Nov 2026);
+// GENERATED from FORA_model_kutuphanesi.xlsx (library version 11, 13 Nov 2026);
 // do not edit by hand. Every coefficient in that workbook was checked against
 // the original paper (status "Doğrulandı"), read twice from the open-access
 // web version ("Web okuması"), taken from a paper that quotes the original
@@ -286,7 +286,7 @@ print(len(src), 'bytes')
 OUT_DBH = 'src/dbhLibrary.js'
 ov = wv['Okuyun']
 H0, CD0, R0, CA0 = (ov[c].value for c in ('C13', 'C14', 'C15', 'C17'))
-CROWN = {'JUC-D6': 'mean', 'BAL-D3': 'mean', 'VAL': 'eq', 'GB-dbh2': 'area'}
+CROWN = {'JUC-D6': 'mean', 'BAL-D3': 'mean', 'VAL': 'eq', 'GB-dbh2': 'area', 'GEN19-QCE-CD': 'mean'}
 EU_KEYS = ('Finlandiya', 'Hırvatistan', 'İspanya', 'Avrupa')
 dbh = []
 dm, dmv = wf['DBH_modelleri'], wv['DBH_modelleri']
@@ -336,7 +336,7 @@ for m in dbh:
     lines.append('  {' + ','.join(fields) + '}')
 head = '''// dbhLibrary.js — DBH models from outside Türkiye in FORA's model library.
 //
-// GENERATED from FORA_model_kutuphanesi.xlsx (library version 10, 13 Nov 2026),
+// GENERATED from FORA_model_kutuphanesi.xlsx (library version 11, 13 Nov 2026),
 // sheets DBH_modelleri and Jucker_bolgesel (Palearctic rows); do not edit by hand.
 // FORA's own Turkish DBH models are in species.js; dbhChoice.js combines both.
 //

@@ -751,7 +751,7 @@ return(<><div style={{fontSize:9,color:txD,marginBottom:8}}>{L?"Manuel değer gi
 const recD=dbhChoice(sp).model.code,recB=biomassChoice(sp).model.code,dm=dch.model,m=ch.model;
 const IV={d:"DBH",h:L?"boy":"height",cd:L?"taç":"crown"};
 const CROWN_TXT={mean:L?"ortalama taç çapı (sınır kutusu)":"mean crown diameter (bounding box)",max:L?"en büyük taç çapı":"maximum crown diameter",eq:L?"taç alanına eşit dairenin çapı":"diameter of a circle with the crown area",area:L?"taç alanı":"crown area",fora:L?"Araç sekmesinde seçilen taç çapı":"crown diameter set in the Tools tab"};
-const short=x=>`${x.code} — ${x.source.split(/,| vd\.| &/)[0]} ${(x.source.match(/\b(19|20)\d\d\b/)||[""])[0]}`;
+const short=x=>{const a=x.source.split(/,| vd\.| &/)[0],y=(x.source.match(/\b(19|20)\d\d\b/)||[""])[0];return `${x.code} — ${a}${y&&!a.includes(y)?" "+y:""}`;};
 const groups=(list,rec)=>["eu","tr","world"].map(sc=>{const xs=list(sc);return xs.length?<optgroup key={sc} label={SCOPE_LABEL[sc][lng]}>{xs.map(x=><option key={x.code} value={x.code}>{short(x)}{x.code===rec?(L?" (önerilen)":" (recommended)"):""}</option>)}</optgroup>:null;});
 const st=x=><span style={{color:/dikkat|İkincil|Site|Web/.test(x.status)?og:gn2}}>{L?x.status:(STATUS_EN[x.status]||x.status)}</span>;
 const rngTxt=(r,u)=>r?`${r[0]}–${r[1]} ${u}`:(L?"yayımlanmamış":"not reported");
@@ -770,7 +770,7 @@ return(<>
 <select style={{...IN,width:"100%",marginBottom:3}} value={dm.code} onChange={e=>setDCode(e.target.value)}>{groups(sc=>dbhModelsFor(sp,sc),recD)}</select>
 <div style={{...box,borderLeft:`2px solid ${ac}`}}>
 {L?"Girdiler: ":"Inputs: "}{dm.inputs.map(k=>IV[k]).join(" + ")}{dm.crown?` (${CROWN_TXT[dm.crown]})`:""} · {st(dm)}
-{dm.d?<> · DBH {rngTxt(dm.d,"cm")}</>:null}{dm.h?<> · {IV.h} {rngTxt(dm.h,"m")}</>:null}
+{dm.d?<> · DBH {rngTxt(dm.d,"cm")}</>:null}{dm.h&&dm.inputs.includes("h")?<> · {IV.h} {rngTxt(dm.h,"m")}</>:null}{dm.c&&dm.inputs.includes("cd")?<> · {IV.cd} {rngTxt(dm.c,dm.crown==="area"?"m²":"m")}</>:null}
 {dch.fallback&&<div style={{color:og}}>{L?"Avrupa–Akdeniz'de bu tür için çap modeli yok; Dünya modeli öneriliyor.":"No Europe–Mediterranean DBH model for this species; a world model is recommended."}</div>}
 {/^BETA/.test(dm.note||"")&&<div style={{color:og,fontWeight:600}}>⚠ {L?dm.note:"BETA: approximate; not validated for Turkish stands."}</div>}
 {det(dm,null,true)}</div>

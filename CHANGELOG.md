@@ -19,11 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the biomass model is chosen from a list grouped by scope (Europe–Mediterranean,
   Türkiye, world); the recommended model is the first Europe–Mediterranean one.
   The source, inputs, data range and how the coefficients were checked are shown.
-- Choice of DBH model: 27 models from outside Türkiye (`src/dbhLibrary.js`,
+- Choice of DBH model: 30 library models (`src/dbhLibrary.js`,
   generated from the workbook: Valbuena Rabadán et al. 2016, Kalliovirta & Tokola
   2005, Balenović et al. 2015, Jucker et al. 2017 global and Palearctic, and
-  Gonzalez-Benecke et al. 2014) next to FORA's own Turkish models, grouped by
-  scope in the Sp tab (`src/dbhChoice.js`). Each model receives the crown measure
+  Gonzalez-Benecke et al. 2014) and three Turkish Turkey oak models (Gencal
+  2019 MSc thesis; Sönmez & Gencal 2023, Bursa) next to FORA's own Turkish
+  models, grouped by scope in the Sp tab (`src/dbhChoice.js`). Each model receives the crown measure
   it was fitted with (mean, maximum or equal-area crown diameter, or crown area);
   the crown-based biomass models get the mean crown diameter.
 - DBH model spread: mean tree DBH from every DBH model that fits the species, in
