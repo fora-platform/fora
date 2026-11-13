@@ -195,7 +195,7 @@ Species and models are chosen in one place, the **Sp** tab. The top of the Metri
 
 1. Pick the species (7 species).
 2. Check or change the **DBH model** and the **biomass model**.
-3. Press **Apply**. If you change the selection without pressing Apply, a "Selection changed" warning appears.
+3. Press **Apply**. A green **✓ Applied** box tells you for how many trees DBH₁ and biomass were computed; **See the tree table →** opens the table in the Metrics tab. If you change the selection without pressing Apply, a "Selection changed" warning appears.
 
 In both lists the models are grouped by where their data come from: **Europe–Mediterranean**, **Türkiye**, **World**. The model marked *(recommended)* is used unless you pick another.
 

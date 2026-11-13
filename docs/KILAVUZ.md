@@ -195,7 +195,7 @@ Tür ve modeller tek yerden, **Tür** sekmesinden seçilir. Metrik sekmesinin ü
 
 1. Türü seç (7 tür).
 2. **Çap (DBH) modelini** ve **biyokütle modelini** kontrol et ya da değiştir.
-3. **Uygula**'ya bas. Seçimi değiştirip Uygula'ya basmazsan "Seçim değişti" uyarısı çıkar.
+3. **Uygula**'ya bas. Yeşil **✓ Uygulandı** kutusu kaç ağacın DBH₁'inin ve biyokütlesinin hesaplandığını söyler; **Ağaç tablosunda gör →** Metrik sekmesindeki tabloyu açar. Seçimi değiştirip Uygula'ya basmazsan "Seçim değişti" uyarısı çıkar.
 
 Her iki listede modeller nereden geldiklerine göre gruplu: **Avrupa–Akdeniz**, **Türkiye**, **Dünya**. *(önerilen)* yazan model, sen başkasını seçmedikçe kullanılır.
 

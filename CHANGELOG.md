@@ -60,8 +60,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   models of one species instead of three species. Some Turkish names are more
   precise (Uludağ göknarı, Doğu kayını, Saçlı meşe).
 - Species and models are chosen only in the Sp tab; the Metrics tab shows the
-  applied species and models with a link to the Sp tab, and warns in the Sp tab
-  when the selection has changed but was not applied.
+  applied species and models with a link to the Sp tab. After Apply, the Sp tab
+  confirms how many trees got DBH₁ and biomass and links to the tree table; it
+  warns when the selection has changed but was not applied.
 - CSV: new columns `Biomass_model`, `Biomass_out_of_range`, `BGB_source`,
   `DBH_source`, `DBH_out_of_range`; a DBH_MODEL block and the carbon block record
   the models, coefficients and their sources.

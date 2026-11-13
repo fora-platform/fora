@@ -776,8 +776,15 @@ return(<>
 {L?"Kök: ":"Roots: "}{ch.root?`${ch.root.code} — ${ch.root.source.split(/,| vd\.| &/)[0]}`:(L?"kök modeli yok; IPCC kök/gövde oranı":"no root model; IPCC root-to-shoot ratio")}
 {det(m)}</div>
 {met&&bInfo&&!applied&&<div style={{fontSize:9,color:og,marginBottom:4}}>{L?"Seçim değişti; uygulamak için Uygula'ya basın.":"Selection changed; press Apply to use it."}</div>}
-</>);})()}
 <button style={{...BT(true),width:"100%"}} onClick={hSp} disabled={!met}>{L?"Uygula":"Apply"}</button>
+{met&&bInfo&&applied&&(()=>{const ds=met.filter(x=>Number.isFinite(x.dbhModel)),nB=met.filter(x=>x.bm_total>0).length,mean=ds.length?ds.reduce((a,x)=>a+x.dbhModel,0)/ds.length:null;
+return(<div style={{marginTop:6,padding:"6px 8px",background:gn2+"14",border:`1px solid ${gn2}55`,borderRadius:4,fontSize:9,color:txM,lineHeight:1.5}}>
+<div style={{color:gn2,fontWeight:600}}>✓ {L?"Uygulandı":"Applied"}</div>
+<div>{L?`DBH₁ hesaplandı: ${ds.length} / ${met.length} ağaç`:`DBH₁ computed: ${ds.length} / ${met.length} trees`}{mean!=null?(L?`, ortalama ${mean.toFixed(1)} cm`:`, mean ${mean.toFixed(1)} cm`):""}</div>
+<div>{L?`Biyokütle: ${nB} ağaç (karbon aşağıda)`:`Biomass: ${nB} trees (carbon below)`}</div>
+<button style={{...BT(false),marginTop:4,padding:"2px 8px",fontSize:9}} onClick={()=>setTab("metrics")}>{L?"Ağaç tablosunda gör →":"See the tree table →"}</button>
+</div>);})()}
+</>);})()}
 {!met&&<div style={{fontSize:8,color:txD,marginTop:4}}>{L?"Önce Seg sekmesinde segmentasyonu çalıştırın.":"Run segmentation in the Seg tab first."}</div>}</Sc>
 {carb&&<Sc t={L?"Karbon tahmini (IPCC)":"Carbon estimate (IPCC)"}><div style={{fontSize:9,color:txM,lineHeight:1.8}}>
 {[[L?"Biyokütlesi olan ağaç":"Trees with biomass",`${carb.treesWithBiomass} / ${met.length}`],[L?"Yer üstü biyokütle":"Above-ground biomass",`${carb.agb_t.toFixed(2)} t`],[L?"Yer altı biyokütle":"Below-ground biomass",`${carb.bgb_t.toFixed(2)} t`],[L?"Karbon stoku":"Carbon stock",`${carb.carbon_tC.toFixed(2)} t C`],[L?"CO₂ eşdeğeri":"CO₂ equivalent",`${carb.co2eq_tCO2.toFixed(2)} t CO₂e`],
