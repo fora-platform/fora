@@ -214,7 +214,7 @@ FORA çapı LiDAR boyundan ve tacından tahmin eder. Önerilen model, varsa Avru
 | Saçlı meşe | CIM11-QCE — Cimini & Salvati 2011 (İtalya) **[BETA]** | — |
 
 - Her model, uydurulduğu **taç ölçüsünü** alır: Jucker ve Balenović ortalama taç çapını (sınır kutusu), Kalliovirta & Tokola en büyük taç çapını, Valbuena taç alanına eşit dairenin çapını. FORA'nın kendi modelleri Araç sekmesinde seçtiğin taç yöntemini kullanmaya devam eder.
-- Kutuda girdiler, veri aralığı ve doğrulama durumu yazar; **Ayrıntı**'da kaynak, bölge ve denklem var. Kızılçamın üç bölge modeli artık ayrı tür değil, Türkiye grubunda üç çap modeli.
+- Kutuda girdiler, veri aralığı ve doğrulama durumu yazar. **Ayrıntı**'yı açınca FORA'nın hesapladığı formül katsayılarıyla birlikte yazar (her model için; ne hesaplanıyorsa o), altında değişkenlerin anlamı, kaynak ve bölge var. Biyokütle modellerinde de aynı. Kızılçamın üç bölge modeli artık ayrı tür değil, Türkiye grubunda üç çap modeli.
 - Modelin veri aralığı dışındaki ağaçlar çap alır ama işaretlenir; Metrik sekmesindeki satır kaç ağaç olduğunu söyler. **Çap modelleri arası** satırı, türe uyan bütün çap modelleriyle ortalama DBH'nin ne kadar değiştiğini gösterir.
 - **BETA:** Fıstıkçamı (Tarsus) ve saçlı meşe (İtalya) modelleri yaklaşık; dikkatli kullan.
 - **Seg'i yeniden çalıştırırsan Uygula'ya yeniden bas.**

@@ -351,3 +351,112 @@ head = '''// dbhLibrary.js — DBH models from outside Türkiye in FORA's model 
 src = head + '\nexport const DBH_MODELS = [\n' + ',\n'.join(lines) + '\n];\n\nexport const DBH_BY_CODE = Object.fromEntries(DBH_MODELS.map((m) => [m.code, m]));\n'
 open(OUT_DBH, 'w', encoding='utf-8').write(src)
 print(len(src), 'bytes')
+
+# =====================================================================================
+# Readable formula with the coefficients, from the generated JavaScript expression:
+# the exact formula FORA computes, shown in the Sp tab ("Ayrıntı").
+JTOK = re.compile(r"\s*(?:(?P<num>\d+\.?\d*(?:[eE][-+]?\d+)?)|(?P<fn>Math\.(?:exp|log|sqrt))\(|(?P<id>Math\.PI|[A-Za-z_]+)|(?P<op>\*\*|[-+*/()?:<>]))")
+
+def jparse(src):
+    toks, pos = [], 0
+    while pos < len(src):
+        m = JTOK.match(src, pos)
+        if not m or m.end() == pos:
+            if src[pos:].strip() == '': break
+            raise ValueError('formula: ' + src[pos:pos + 20])
+        toks.append((m.lastgroup, m.group(m.lastgroup))); pos = m.end()
+    i = 0
+    def peek(): return toks[i] if i < len(toks) else (None, None)
+    def take():
+        nonlocal i; t = toks[i]; i += 1; return t
+    def ternary():
+        c = cmp_()
+        if peek()[1] == '?':
+            take(); a = ternary(); assert take()[1] == ':'; b = ternary(); return ('?', c, a, b)
+        return c
+    def cmp_():
+        a = add()
+        while peek()[1] in ('<', '>'):
+            op = take()[1]; a = (op, a, add())
+        return a
+    def add():
+        a = mul()
+        while peek()[1] in ('+', '-'):
+            op = take()[1]; a = (op, a, mul())
+        return a
+    def mul():
+        a = unary()
+        while peek()[1] in ('*', '/'):
+            op = take()[1]; a = (op, a, unary())
+        return a
+    def unary():
+        if peek()[1] == '-': take(); return ('neg', unary())
+        return power()
+    def power():
+        b = atom()
+        if peek()[1] == '**': take(); return ('^', b, unary())
+        return b
+    def atom():
+        k, v = take()
+        if k == 'num': return ('num', float(v))
+        if k == 'id': return ('id', v)
+        if k == 'fn':
+            a = ternary(); assert take()[1] == ')'; return ('call', v[5:], a)
+        if v == '(':
+            e = ternary(); assert take()[1] == ')'; return e
+        raise ValueError('formula token ' + v)
+    e = ternary()
+    assert i == len(toks), toks[i:]
+    return e
+
+SUP = {2.0: '²', 3.0: '³'}
+def jfmt(e, names):
+    def num(x):
+        if x == int(x) and abs(x) < 1e6: return str(int(x))
+        return repr(float(f'{x:.7g}'))
+    PREC = {'?': 7, '<': 2, '>': 2, '+': 3, '-': 3, '*': 4, '/': 4, 'neg': 5, '^': 6}   # [a ? b : c] is printed in brackets
+    def p(e):
+        k = e[0]
+        return PREC.get(k, 7)
+    def wrap(e, need, strict=False):
+        s = f(e)
+        return f'({s})' if (p(e) < need or (strict and p(e) == need)) else s
+    def f(e):
+        k = e[0]
+        if k == 'num': return num(e[1])
+        if k == 'id': return 'π' if e[1] == 'Math.PI' else names.get(e[1], e[1])
+        if k == 'call':
+            name = {'exp': 'exp', 'log': 'ln', 'sqrt': '√'}[e[1]]
+            inner = f(e[2])
+            return f'√{inner}' if name == '√' and p(e[2]) == 7 else f'{name}({inner})'
+        if k == 'neg': return '−' + wrap(e[1], 5)
+        if k == '^':
+            base = wrap(e[1], 7)
+            if e[2][0] == 'num' and e[2][1] in SUP: return base + SUP[e[2][1]]
+            ex = f(e[2]) if p(e[2]) >= 5 else f'({f(e[2])})'
+            return f'{base}^{ex}'
+        if k in ('*', '/'):
+            return f'{wrap(e[1], 4)}{"·" if k == "*" else "/"}{wrap(e[2], 4, strict=True)}'
+        if k in ('+', '-'):
+            r = e[2]
+            if k == '+' and r[0] == 'neg': return f'{wrap(e[1], 3)} − {wrap(r[1], 4)}'
+            if k == '+' and r[0] == 'num' and r[1] < 0: return f'{wrap(e[1], 3)} − {num(-r[1])}'
+            return f'{wrap(e[1], 3)} {"+" if k == "+" else "−"} {wrap(r, 3, strict=(k == "-"))}'
+        if k in ('<', '>'): return f'{wrap(e[1], 3)} {k} {wrap(e[2], 3)}'
+        if k == '?': return f'[{f(e[1])} ? {f(e[2])} : {f(e[3])}]'
+        raise ValueError(k)
+    return f(e)
+
+CROWN_NAME = {'mean': 'CD', 'max': 'CDmax', 'eq': 'CDe', 'area': 'CA', None: 'CD'}
+def formula(js, crown=None):
+    return jfmt(jparse(js), {'d': 'd', 'h': 'h', 'cd': CROWN_NAME.get(crown, 'CD')}).replace(' + −', ' − ')
+
+for path, items, crown_of in ((OUT, models, lambda m: None), (OUT_DBH, dbh, lambda m: m['crown'])):
+    txt = open(path, encoding='utf-8').read()
+    for m in items:
+        fm = formula(m['js'], crown_of(m))
+        key = f'code:{s(m["code"])},'
+        assert txt.count(key) == 1, m['code']
+        txt = txt.replace(key, key + f'formula:{s(fm)},')
+    open(path, 'w', encoding='utf-8').write(txt)
+print('formüller yazıldı')

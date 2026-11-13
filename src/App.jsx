@@ -757,8 +757,13 @@ const st=x=><span style={{color:/dikkat|İkincil|Site|Web/.test(x.status)?og:gn2
 const rngTxt=(r,u)=>r?`${r[0]}–${r[1]} ${u}`:(L?"yayımlanmamış":"not reported");
 const box={fontSize:8,color:txM,padding:"4px 6px",background:dk,borderRadius:3,lineHeight:1.5,marginBottom:8};
 const lbl={fontSize:9,color:tx,fontWeight:600,marginBottom:3};
-const det=(x,extra)=>(<details style={{marginTop:2}}><summary style={{cursor:"pointer",color:txD}}>{L?"Ayrıntı":"Details"}</summary>
-<div>🌲 {x.source}{x.doi?<> · {x.doi}</>:null}<br/>{L?`${x.species} · ${x.region}`:x.region}<br/>{L&&x.eq?<>{x.eq}<br/></>:null}{L&&x.note?<span style={{color:txD}}>{x.note}<br/></span>:null}{extra}</div></details>);
+const VARS=isDbh=>[["d",L?"DBH (cm)":"DBH (cm)"],["h",L?"boy (m)":"height (m)"],["CDmax",L?"en büyük taç çapı (m)":"maximum crown diameter (m)"],["CDe",L?"taç alanına eşit dairenin çapı (m)":"diameter of a circle with the crown area (m)"],["CA",L?"taç alanı (m²)":"crown area (m²)"],["CD",isDbh?(L?"taç çapı (m)":"crown diameter (m)"):(L?"ortalama taç çapı (m)":"mean crown diameter (m)")],["Hdom",L?"üst boy (m)":"top height (m)"]];
+const legend=(f,isDbh)=>{const used=VARS(isDbh).filter(([v])=>new RegExp(`(^|[^A-Za-z])${v}([^A-Za-z]|$)`).test(f)).map(([v,t])=>`${v}: ${t}`);
+const res=f.startsWith("h = ")?(L?"h'den d sayısal olarak çözülür":"solved numerically for d"):isDbh?(L?"sonuç: DBH (cm)":"result: DBH (cm)"):(L?"sonuç: kuru kütle (kg)":"result: dry mass (kg)");
+return [...used,res,...(/\?/.test(f)?[L?"[a ? b : c]: a doğruysa b, değilse c":"[a ? b : c]: b if a holds, otherwise c"]:[])].join(" · ");};
+const det=(x,extra,isDbh)=>(<details style={{marginTop:2}}><summary style={{cursor:"pointer",color:txD}}>{L?"Ayrıntı":"Details"}</summary>
+<div>{x.formula&&<><div style={{fontFamily:"monospace",fontSize:9,color:tx,background:ac+"14",padding:"3px 5px",borderRadius:3,margin:"2px 0",wordBreak:"break-word"}}>{x.formula}</div><div style={{color:txD,marginBottom:3}}>{legend(x.formula,isDbh)}</div></>}
+🌲 {x.source}{x.doi?<> · {x.doi}</>:null}<br/>{L?`${x.species} · ${x.region}`:x.region}<br/>{L&&x.eq?<span style={{color:txD}}>{"Makalede: "}{x.eq}<br/></span>:null}{L&&x.note?<span style={{color:txD}}>{x.note}<br/></span>:null}{extra}</div></details>);
 const applied=bInfo&&bInfo.species===sp&&(bInfo.dbhCode||"")===dCode&&(bInfo.bCode||"")===bCode;
 return(<>
 <div style={lbl}>{L?"Çap (DBH) modeli":"DBH model"}</div>
@@ -768,13 +773,13 @@ return(<>
 {dm.d?<> · DBH {rngTxt(dm.d,"cm")}</>:null}{dm.h?<> · {IV.h} {rngTxt(dm.h,"m")}</>:null}
 {dch.fallback&&<div style={{color:og}}>{L?"Avrupa–Akdeniz'de bu tür için çap modeli yok; Dünya modeli öneriliyor.":"No Europe–Mediterranean DBH model for this species; a world model is recommended."}</div>}
 {/^BETA/.test(dm.note||"")&&<div style={{color:og,fontWeight:600}}>⚠ {L?dm.note:"BETA: approximate; not validated for Turkish stands."}</div>}
-{det(dm)}</div>
+{det(dm,null,true)}</div>
 <div style={lbl}>{L?"Biyokütle modeli":"Biomass model"}</div>
 <select style={{...IN,width:"100%",marginBottom:3}} value={m.code} onChange={e=>setBCode(e.target.value)}>{groups(sc=>modelsFor(sp,sc),recB)}</select>
 <div style={{...box,borderLeft:`2px solid ${gn2}`}}>
 {L?"Girdiler: ":"Inputs: "}{m.inputs.map(k=>IV[k]).join(" + ")} · {st(m)} · DBH {rngTxt(m.d,"cm")}{m.h&&m.inputs.includes("h")?<> · {IV.h} {rngTxt(m.h,"m")}</>:null}{m.cf?` · ${L?"log düzeltmesi":"log correction"} ×${m.cf}`:""}<br/>
 {L?"Kök: ":"Roots: "}{ch.root?`${ch.root.code} — ${ch.root.source.split(/,| vd\.| &/)[0]}`:(L?"kök modeli yok; IPCC kök/gövde oranı":"no root model; IPCC root-to-shoot ratio")}
-{det(m)}</div>
+{det(m,null,false)}</div>
 {met&&bInfo&&!applied&&<div style={{fontSize:9,color:og,marginBottom:4}}>{L?"Seçim değişti; uygulamak için Uygula'ya basın.":"Selection changed; press Apply to use it."}</div>}
 <button style={{...BT(true),width:"100%"}} onClick={hSp} disabled={!met}>{L?"Uygula":"Apply"}</button>
 {met&&bInfo&&applied&&(()=>{const ds=met.filter(x=>Number.isFinite(x.dbhModel)),nB=met.filter(x=>x.bm_total>0).length,mean=ds.length?ds.reduce((a,x)=>a+x.dbhModel,0)/ds.length:null;

@@ -108,3 +108,33 @@ test("DBH model spread: mean DBH from every model listed for the species", () =>
   assert.ok(s.n >= 2 && s.min <= s.max);
   assert.equal(dbhSpread([], "pb"), null);
 });
+
+// The formula shown in the interface must be the formula FORA computes.
+import { MODELS } from "../src/biomassLibrary.js";
+const toJs = (f) => f
+  .replace(/−/g, "-").replace(/·/g, "*").replace(/²/g, "**2").replace(/³/g, "**3").replace(/\^/g, "**")
+  .replace(/√\(/g, "Math.sqrt(").replace(/√([A-Za-z]+)/g, "Math.sqrt($1)")
+  .replace(/\bln\(/g, "Math.log(").replace(/\bexp\(/g, "Math.exp(").replace(/π/g, "Math.PI")
+  .replace(/\[/g, "(").replace(/\]/g, ")").replace(/\b(CDmax|CDe|CA|CD)\b/g, "cd");
+test("formulas shown in the interface reproduce every library model", () => {
+  for (const m of MODELS) rel(new Function("d", "h", "cd", `return ${toJs(m.formula)}`)(25, 18, 4), m.test, 1e-6);
+  for (const m of DBH_MODELS) rel(new Function("h", "cd", `return ${toJs(m.formula)}`)(18, m.testCd), m.test, 1e-6);
+});
+
+test("formulas of FORA's own DBH models match species.js", () => {
+  for (const m of FORA_DBH) {
+    assert.ok(m.formula, m.code);
+    for (const [h, c] of [[10, 3], [16, 4.5], [21, 5.5]]) {
+      const d = m.fn(h, c);
+      if (!(d > 0)) continue;
+      if (m.formula.startsWith("h = ")) {
+        const [lhs, hdom] = m.formula.slice(4).split("; Hdom = ");
+        const js = toJs(lhs).replace(/Hdom/g, "H0");
+        const H0 = hdom ? Math.max(h + 1, 10) : 0;
+        rel(new Function("d", "H0", `return ${js}`)(d, H0), h, 1e-6);
+      } else {
+        rel(new Function("h", "cd", `return ${toJs(m.formula)}`)(h, c), d);
+      }
+    }
+  }
+});

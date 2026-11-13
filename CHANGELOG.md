@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the crown-based biomass models get the mean crown diameter.
 - DBH model spread: mean tree DBH from every DBH model that fits the species, in
   the Metrics tab, CSV and PDF.
+- Every DBH and biomass model shows, under Details, the formula FORA computes with
+  its coefficients and what each variable means. The formulas are generated from
+  the same expressions the models run, and a test checks that they agree.
 - Below-ground biomass from root models where the species has one (from the same
   paper as the above-ground model where possible).
 - Model spread: stand above-ground biomass from every model that fits the

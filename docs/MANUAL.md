@@ -214,7 +214,7 @@ FORA estimates DBH from LiDAR height and crown. The recommended model is the Eur
 | Turkey oak | CIM11-QCE — Cimini & Salvati 2011 (Italy) **[BETA]** | — |
 
 - Each model gets the **crown measure** it was fitted with: Jucker and Balenović the mean crown diameter (bounding box), Kalliovirta & Tokola the maximum crown diameter, Valbuena the diameter of a circle with the crown's area. FORA's own models keep using the crown outline chosen in the Tools tab.
-- The box shows the inputs, data range and how the coefficients were checked; **Details** gives the source, region and equation. Calabrian pine's three regional models are no longer separate species but three DBH models in the Türkiye group.
+- The box shows the inputs, data range and how the coefficients were checked. **Details** shows the formula FORA computes, with its coefficients (for every model; exactly what is calculated), then what each variable means, the source and the region. The same applies to biomass models. Calabrian pine's three regional models are no longer separate species but three DBH models in the Türkiye group.
 - Trees outside the model's data range get a DBH but are flagged; the line in the Metrics tab says how many. The **Across DBH models** line shows how much the mean DBH changes across every DBH model that fits the species.
 - **BETA:** the stone pine (Tarsus) and Turkey oak (Italy) models are approximate; use them with care.
 - **If you run Seg again, press Apply again.**
