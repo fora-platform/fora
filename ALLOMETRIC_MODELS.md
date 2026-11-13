@@ -146,9 +146,9 @@ Türkiye group.
 
 ## DBH models in the model library (v2.0)
 
-`src/dbhLibrary.js` holds 30 DBH models generated from FORA's model-library
+`src/dbhLibrary.js` holds 31 DBH models generated from FORA's model-library
 workbook by `tools/build_biomass_library.py`; the test suite checks each against
-the workbook value at h = 18 m and eight against coefficients typed from the
+the workbook value at h = 18 m and nine against coefficients typed from the
 papers. `src/dbhChoice.js` lists, for each species, its models by scope
 (Europe–Mediterranean, Türkiye, World). The recommended model is the first
 Europe–Mediterranean one; a species without one gets its first World model.
@@ -161,13 +161,20 @@ Europe–Mediterranean one; a species without one gets its first World model.
 | JUC-D6 | Jucker et al. 2017, Global Change Biology 23:177–190, Eq. 6 | global | (h × mean crown diameter) |
 | JUC-S4-…, JUC-S3-… | Jucker et al. 2017, supplementary Tables S3–S4 | Palearctic, by biome and conifer/broadleaf | (h × mean crown diameter) |
 | GB-dbh1, GB-dbh2 | Gonzalez-Benecke et al. 2014, J. Forestry Research 25(1):43–52 | USA, *P. palustris* (not mapped to a FORA species) | h, or h + crown area |
+| GEN19-QCE-DH | Fitted for FORA on the thesis data of Gencal 2019 (98 plots, 1080 trees): d = −1.80157 + 1.81581·h | Türkiye, Bursa, *Q. cerris* | h |
 | GEN19-QCE-H | Gencal 2019, MSc thesis, Bursa Technical University, Eq. 4.10: h = 2.297·d^0.570 | Türkiye, Bursa, *Q. cerris*, 1131 trees | h |
 | GEN19-QCE-CD | Gencal 2019, Eq. 4.11; Sönmez & Gencal 2023, Ormancılık Araştırma Dergisi 10:92–104: CD = 1.310 + 0.198·d | as above, 721 trees | mean crown diameter |
 | SON23-QCE-H | Sönmez & Gencal 2023: h = exp(3.026 − 8.438/d) | as above | h (no result above 20.6 m) |
 
-The three Turkey oak models were fitted in the direction h = f(d) or CD = f(d)
-and are solved for d; like the other inverted height–diameter models, they can
-exaggerate DBH at the ends of the range.
+The three published Turkey oak models estimate height or crown diameter from
+DBH, as published, and FORA solves them for d. Because FORA estimates DBH from
+height, GEN19-QCE-DH was fitted on the same thesis data in that direction
+(R² 0.652, residual SE 6.27 cm; leaving out one plot at a time, RMSE 6.33 cm
+and bias 0.01 cm). On the same data, the regression of height on DBH and that of
+DBH on height are different lines; this is not a contradiction but a result of
+the direction of prediction. GEN19-QCE-DH is the recommended model of the
+Türkiye group and complements the published models, which remain valid for
+estimating height and crown diameter from DBH.
 
 Each model receives the crown measure it was fitted with, computed from FORA's
 crown outline: the mean of the two bounding-box sides for a mean crown

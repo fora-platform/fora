@@ -60,7 +60,7 @@ export const SPECIES_DBH = {
   pn: { eu: ["BAL-D3"], tr: ["OZC14-PNI"], world: ["JUC-S4-21", "JUC-S4-24", "JUC-D6"] },
   fo: { eu: [], tr: ["ERC15-FOR"], world: ["JUC-S4-20", "JUC-D6"] },
   pp: { eu: [], tr: ["CAR18-PPI"], world: ["JUC-S4-24", "JUC-D6"] },
-  qc: { eu: ["CIM11-QCE"], tr: ["GEN19-QCE-H", "GEN19-QCE-CD", "SON23-QCE-H"], world: ["JUC-S4-20", "JUC-S4-23", "JUC-D6"] },
+  qc: { eu: ["CIM11-QCE"], tr: ["GEN19-QCE-DH", "GEN19-QCE-H", "GEN19-QCE-CD", "SON23-QCE-H"], world: ["JUC-S4-20", "JUC-S4-23", "JUC-D6"] },
 };
 
 const key = (sp) => (sp && sp.startsWith("pb") ? "pb" : sp);

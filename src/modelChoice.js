@@ -34,6 +34,7 @@ export const STATUS_EN = {
   "İkincil kaynak": "coefficients from a paper that quotes the original",
   "Site kaydı": "coefficients from a public equation database (treeallometry.org)",
   "FORA modeli": "FORA's own DBH model since v1 (see ALLOMETRIC_MODELS.md)",
+  "Tez verisinden (FORA)": "fitted for FORA on the thesis data of Gencal (2019), unpublished",
 };
 
 // group: IPCC group for the carbon defaults (conifer, broadleaf, oak)
